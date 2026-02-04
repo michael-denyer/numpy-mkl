@@ -322,10 +322,6 @@ jobs:
         run: |
           tools/store_info.py release/*.json --store build.json
 
-      - name: Update badges
-        run: |
-          tools/update_icons README.md --store build.json
-
       - name: Commit release data
         run: |
           if [[ -z "$(git status --porcelain)" ]]; then
