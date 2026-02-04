@@ -276,9 +276,10 @@ jobs:
           # dispatcher loads them via dlopen (not ELF NEEDED), so auditwheel's RPATH
           # patching doesn't help. Normally mkl-service handles this, but we can't
           # install it without pulling LP64 deps from PyPI. Set LD_LIBRARY_PATH instead.
+          # Note: Can't use `python -c "import numpy"` here since numpy itself needs MKL.
           if [[ "${{ runner.os }}" == "Linux" ]]; then
-            numpy_libs="$(python -c "import numpy; print(numpy.__path__[0])")/../numpy.libs"
-            export LD_LIBRARY_PATH="${numpy_libs}:${LD_LIBRARY_PATH:-}"
+            site_pkgs="$(python -c "import site; print(site.getsitepackages()[0])")"
+            export LD_LIBRARY_PATH="${site_pkgs}/numpy.libs:${LD_LIBRARY_PATH:-}"
           fi
 
           case "${{ inputs.name }}" in
