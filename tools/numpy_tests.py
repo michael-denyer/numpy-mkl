@@ -33,13 +33,22 @@ print("  PASSED")
 
 # Test 3: Eigendecomposition (LAPACK - critical for ILP64)
 print("Test 3: Eigendecomposition (LAPACK)...")
-M = np.random.randn(50, 50)
-M = M @ M.T  # Make symmetric positive definite
-eigenvalues, eigenvectors = np.linalg.eigh(M)
-# Verify: M @ v = lambda * v
-reconstructed = eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T
-assert np.allclose(M, reconstructed, rtol=1e-10)
-print("  PASSED")
+import traceback
+try:
+    M = np.random.randn(50, 50)
+    M = M @ M.T  # Make symmetric positive definite
+    print("  Created 50x50 symmetric matrix, calling eigh...")
+    sys.stdout.flush()
+    eigenvalues, eigenvectors = np.linalg.eigh(M)
+    print(f"  Got {len(eigenvalues)} eigenvalues")
+    # Verify: M @ v = lambda * v
+    reconstructed = eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T
+    assert np.allclose(M, reconstructed, rtol=1e-10)
+    print("  PASSED")
+except Exception as e:
+    print(f"  FAILED: {type(e).__name__}: {e}")
+    traceback.print_exc()
+    sys.exit(1)
 
 # Test 4: SVD (another LAPACK operation)
 print("Test 4: SVD decomposition...")
