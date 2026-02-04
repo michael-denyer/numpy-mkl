@@ -6,7 +6,6 @@ defaults:
     - "3.14"
 
   runners:
-    - ["windows-2022", null]
     - ["ubuntu-latest", "quay.io/pypa/manylinux_2_28_x86_64"]
 
   version: latest

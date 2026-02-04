@@ -89,14 +89,9 @@ jobs:
           # Need this since pyproject.toml doesn't apply to $SRC_DIR.
           echo "UV_PYTHON_PREFERENCE=only-managed" >>$GITHUB_ENV
 
-          case "${{ runner.os }}" in
-            Linux) echo "venv_bin=bin" >>$GITHUB_ENV ;;
-            Windows) echo "venv_bin=Scripts" >>$GITHUB_ENV ;;
-          esac
+          echo "venv_bin=bin" >>$GITHUB_ENV
 
-          # Move src to avoid pyproject conflicts. SRC_DIR is set relative to GITHUB_WORKSPACE to
-          # preserve the "D:\" prefix on Windows. (Pure Linux paths aren't supported as arguments
-          # to 'working-directory'.)
+          # Move src to avoid pyproject conflicts.
           mv src ../../ && echo "SRC_DIR=${GITHUB_WORKSPACE}/../../src" >>$GITHUB_ENV
 
           # Keep MKL directory short as it ends up in the final build.
@@ -128,10 +123,8 @@ jobs:
               >>"${GITHUB_WORKSPACE}/patches/LICENSE_MKL.txt"
 
           # Add .so -> .so.2 symlinks to fix linking for mkl-service.
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            cd "${{ env.MKL_DIR }}"/lib
-            for i in $( ls libmkl*.so.2 ); do ln -s $i ${i%.*}; done
-          fi
+          cd "${{ env.MKL_DIR }}"/lib
+          for i in $( ls libmkl*.so.2 ); do ln -s $i ${i%.*}; done
 
       - name: Apply patches
         run: |
@@ -139,10 +132,6 @@ jobs:
           cd "${{ env.SRC_DIR }}"
           git apply "${GITHUB_WORKSPACE}"/patches/${{ inputs.name }}/*.patch
 
-          # Fix MKL pkg-config on Windows.
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            cp "${GITHUB_WORKSPACE}"/patches/mkl/*.pc "${PKG_CONFIG_PATH}/"
-          fi
 
       - name: Add MKL to runtime dependencies
         working-directory: ${{ env.SRC_DIR }}
@@ -165,23 +154,6 @@ jobs:
           cat "${GITHUB_WORKSPACE}/patches/LICENSE_MKL.txt" >>LICENSE.txt
         if: inputs.name != 'mkl-service'
 
-      - name: Install Windows build dependencies
-        run: |
-          # Use fall-through operator ';&' to match all cases.
-          case "${{ inputs.name }}" in
-            numpy | scipy)
-              # Pkg-config is required for numpy and scipy.
-              choco install -y --no-progress --stoponfirstfailure \
-                  --checksum 6004DF17818F5A6DBF19CB335CC92702 pkgconfiglite
-              ;&
-            scipy)
-              # Gcc is required for scipy.
-              choco install rtools -y --no-progress --force --version=4.0.0.20220206
-              echo "c:\rtools40\ucrt64\bin;" >>$GITHUB_PATH
-              ;&
-          esac
-        if: runner.os == 'windows'
-
       - name: Install manylinux build dependencies
         run: |
           case "${{ inputs.name }}" in
@@ -198,7 +170,7 @@ jobs:
             #   [[ "$UV_PYTHON" =~ ^(cp314)$ ]] && dnf -y install libmpc-devel || true
             #   ;&
           esac
-        if: (runner.os == 'linux') && inputs.manylinux
+        if: inputs.manylinux
 
       - name: Build wheel
         working-directory: ${{ env.SRC_DIR }}
@@ -218,7 +190,6 @@ jobs:
                     -Csetup-args=-Dallow-noblas=false \
                     -Csetup-args=-Dcpu-baseline=F16C \
                     -Csetup-args=-Dcpu-dispatch=AVX512_ICL"
-              [[ "${{ runner.os }}" == "Windows" ]] && args="${args} -Csetup-args=--vsenv"
               ;;
 
             scipy)
@@ -232,10 +203,7 @@ jobs:
               ;;
 
             'mkl-service')
-              case "${{ runner.os }}" in
-                Linux) export MKLROOT="${{ env.MKL_DIR }}" ;;
-                Windows) export MKLROOT="${{ env.MKL_DIR }}"/Library ;;
-              esac
+              export MKLROOT="${{ env.MKL_DIR }}"
               export CFLAGS="${CFLAGS} -fno-fast-math"
               args="--no-build-isolation"
               uv venv buildenv && source buildenv/"${{ env.venv_bin }}"/activate
@@ -254,13 +222,6 @@ jobs:
               --plat=manylinux_${plat}
         if: runner.os == 'linux'
 
-      - name: Repair wheel (Windows)
-        run: |
-          mkdir -p wheelhouse
-          uvx delvewheel repair "${{ env.SRC_DIR }}"/dist/*.whl -w wheelhouse \
-              --exclude mkl_rt.2.dll --exclude libsf_error_state.dll
-        if: runner.os == 'windows'
-
       - name: Run tests
         run: |
           # Set up test environment.
@@ -274,9 +235,7 @@ jobs:
           # libmkl_def.so.2 via dlopen() at runtime. These aren't in NEEDED entries so
           # auditwheel doesn't bundle them. Point LD_LIBRARY_PATH at the MKL install so
           # the dispatcher can find them. (End users get this via mkl-service.)
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            export LD_LIBRARY_PATH="${{ env.MKL_DIR }}/lib:${LD_LIBRARY_PATH:-}"
-          fi
+          export LD_LIBRARY_PATH="${{ env.MKL_DIR }}/lib:${LD_LIBRARY_PATH:-}"
 
           case "${{ inputs.name }}" in
             numpy)
