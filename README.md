@@ -1,118 +1,50 @@
-# numpy-mkl
+# numpy-mkl-ilp64
 
-[![NumPy](https://img.shields.io/badge/NumPy-2.1_%7C_2.2_%7C_2.3_%7C_2.4-013243)](https://urob.github.io/numpy-mkl/numpy/)
-[![SciPy](https://img.shields.io/badge/SciPy-1.15_%7C_1.16_%7C_1.17-8caae6)](https://urob.github.io/numpy-mkl/scipy/)
-[![mkl-service](https://img.shields.io/badge/mkl--service-2.4_%7C_2.5_%7C_2.6-3b5526)](https://urob.github.io/numpy-mkl/mkl-service/)
+**ILP64 Fork** - This fork builds NumPy and SciPy with MKL's **ILP64 (64-bit integer)** interface,
+enabling eigendecomposition of matrices larger than 46k × 46k (the LP64 limit).
 
-This repository provides binary wheels for NumPy and SciPy, linked to Intel's high-performance
-[oneAPI Math Kernel
-Library](https://www.intel.com/content/www/us/en/developer/tools/oneapi/onemkl.html) for Intel CPUs.
-The wheels are accessible through a custom Python Package Index (PyPI) and can be installed with
-`pip` or `uv`.
+> **Upstream**: [urob/numpy-mkl](https://github.com/urob/numpy-mkl) (LP64 version)
+
+## Why ILP64?
+
+MKL's default LP64 interface uses 32-bit integers for array indexing, limiting matrices to ~2.1 billion
+elements (46k × 46k). For large-scale eigendecomposition (50k-200k samples), ILP64's 64-bit integers
+remove this limitation.
+
+| Interface | Integer Size | Max Matrix Elements | Max Samples (square) |
+|-----------|--------------|---------------------|----------------------|
+| LP64      | 32-bit       | ~2.1 billion        | ~46,000              |
+| **ILP64** | **64-bit**   | **~9 quintillion**  | **~3 billion**       |
 
 ## Installation
 
-MKL-accelerated wheels are available for 64-bit versions of Linux and Windows. If using one of the
-recommended package manager below, there are no other prerequisites; all dependencies — including
-Python if using uv or Nix — are automatically installed by the package manager.
+```bash
+# Databricks / pip
+pip install numpy scipy --extra-index-url https://michael-denyer.github.io/numpy-mkl --force-reinstall --upgrade
 
-**uv**
-
-```sh
-# Create a Python project with uv.
-uv init
-uv add numpy scipy --index https://urob.github.io/numpy-mkl
+# uv
+uv add numpy scipy --index https://michael-denyer.github.io/numpy-mkl
 ```
 
-**pip**
+## Compatibility Notes
 
-```sh
-# Install globally or into active venv.
-pip install numpy scipy --extra-index-url https://urob.github.io/numpy-mkl
+- **ILP64 wheels are NOT compatible with LP64 wheels** - don't mix them
+- All packages (numpy, scipy, mkl-service) must use the same interface
+- Performance is similar to LP64 for most operations
+
+## Build Changes from Upstream
+
+```diff
+- -Csetup-args=-Dblas=mkl-sdl
+- -Csetup-args=-Dlapack=mkl-sdl
++ -Csetup-args=-Dblas=mkl-dynamic-ilp64-seq
++ -Csetup-args=-Dlapack=mkl-dynamic-ilp64-seq
++ -Csetup-args=-Duse-ilp64=true
 ```
 
-**nix**
+## Original README
 
-```sh
-# Create and run virtual devshell using Nix.
-nix flake init --template github:urob/numpy-mkl
-nix develop .
-```
-
-**manual**
-
-Wheels for manual installs can be [downloaded here](https://urob.github.io/numpy-mkl/). Manual
-installs must install compatible versions of `mkl-service`, `mkl`, and its indirect dependencies. It
-is recommended to install `mkl-service` from this repository, which has been patched to detect and
-autoload the `mkl` library at runtime.
-
-## Cross-platform collaborations
-
-MKL is only available on `x86-64` architectures, excluding macOS systems. When using `uv`, one can
-use [platform markers](https://peps.python.org/pep-0508/#environment-markers) to automatically
-install MKL-linked versions of NumPy and SciPy when on a compatible system, and otherwise fall back
-to the default versions from PyPI.
-
-Below is a simple illustration, which falls back to the PyPI packages on macOS.[^1] To
-install the environment, copy the following snippet into `pyproject.toml` and then run `uv sync`.
-This will install a virtual environment in `.venv`, which can be activated on the command line or
-via most Python editors.
-
-```toml
-[project]
-name = "example-project"
-version = "0.1.0"
-requires-python = ">=3.13"
-dependencies = [
-    "numpy>=2.2.6",
-    "scipy>=1.15.2",
-    "mkl-service>=2.4.2; sys_platform != 'darwin'",
-]
-
-[tool.uv.sources]
-numpy = [{ index = "numpy-mkl", marker = "sys_platform != 'darwin'" }]
-scipy = [{ index = "numpy-mkl", marker = "sys_platform != 'darwin'" }]
-mkl-service = [{ index = "numpy-mkl", marker = "sys_platform != 'darwin'" }]
-
-[[tool.uv.index]]
-name = "numpy-mkl"
-url = "https://urob.github.io/numpy-mkl"
-explicit = true
-```
-
-## Alternatives
-
-The usual way to obtain MKL-accelerated NumPy and SciPy packages is through
-[Anaconda](https://www.anaconda.com/) or [Conda-forge](https://conda-forge.org/). The purpose of
-this repository is to provide an alternative for users who prefer to use `pip` or `uv` for package
-management. Other alternatives are listed below.
-
-|                                                                                                                                 |  Windows | Linux | Notes                      |
-| ------------------------------------------------------------------------------------------------------------------------------- |  ------- | ----- | -------------------------- |
-| This repository                                                                                                                 |  Yes     | Yes   |                            |
-| [Intel(r) Distribution for Python](https://www.intel.com/content/www/us/en/developer/tools/oneapi/distribution-for-python.html) |  Yes     | Yes   | Does not support NumPy 2.x |
-| [Numpy-mkl-wheels](https://github.com/cgohlke/numpy-mkl-wheels)                                                                 |  Yes     | No    | Manual install only        |
-
-## Technical details
-
-Linux wheels are built with `gcc` on Ubuntu 22.04. Windows wheels are built with `msvc` (numpy) and
-`mingw-w64` (scipy) on Windows Server 2022. These compilers showed the most consistent runtime
-performance in a series of [benchmarks](benchmarks/benchmarks.py), even in comparison to
-`icx`-compiled wheels.
-
-All binaries are dynamically linked against the MKL library. The packages are patched to detect the
-library at runtime as long as `mkl` is installed _anywhere_ accessible by Python. (This is indeed
-the case when using one of the recommended install methods above, which will automatically install
-`mkl` alongside NumPy or SciPy.)
-
-## References
-
-- [Intel(r) oneMKL Release
-  Notes](https://www.intel.com/content/www/us/en/developer/articles/release-notes/onemkl-release-notes.html)
-- [Intel(r) oneAPI Release
-  Notes](https://www.intel.com/content/www/us/en/developer/articles/release-notes/intel-oneapi-toolkit-release-notes.html)
-
-[^1]:
-    More sophisticated checks can be added by combining with the `platform_machine` marker. In
-    practices, distinguishing between macOS and other systems seems to be good enough for most use
-    cases.
+See [urob/numpy-mkl](https://github.com/urob/numpy-mkl) for full documentation on:
+- Cross-platform collaborations
+- Alternatives (Anaconda, Intel Distribution)
+- Technical build details

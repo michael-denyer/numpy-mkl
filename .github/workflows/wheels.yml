@@ -26,7 +26,7 @@ on:
 
 jobs:
   meta:
-    if: github.repository == 'urob/numpy-mkl'
+    if: github.repository == 'michael-denyer/numpy-mkl'
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ env.tag }}
@@ -205,8 +205,11 @@ jobs:
         run: |
           case "${{ inputs.name }}" in
             numpy)
-              args="-Csetup-args=-Dblas=mkl-sdl \
-                    -Csetup-args=-Dlapack=mkl-sdl \
+              # ILP64: Use 64-bit integer interface to support matrices >46k x 46k
+              # mkl-dynamic-ilp64-seq uses sequential threading (simpler, avoids thread bugs)
+              args="-Csetup-args=-Dblas=mkl-dynamic-ilp64-seq \
+                    -Csetup-args=-Dlapack=mkl-dynamic-ilp64-seq \
+                    -Csetup-args=-Duse-ilp64=true \
                     -Csetup-args=-Dallow-noblas=false \
                     -Csetup-args=-Dcpu-baseline=F16C \
                     -Csetup-args=-Dcpu-dispatch=AVX512_ICL"
@@ -214,9 +217,11 @@ jobs:
               ;;
 
             scipy)
+              # ILP64: Use 64-bit integer interface for scipy as well
               # MSVC is unable to compile Pythran, use gcc or set -Duse-pythran=false.
-              args="-Csetup-args=-Dblas=mkl-sdl \
-                    -Csetup-args=-Dlapack=mkl-sdl \
+              args="-Csetup-args=-Dblas=mkl-dynamic-ilp64-seq \
+                    -Csetup-args=-Dlapack=mkl-dynamic-ilp64-seq \
+                    -Csetup-args=-Duse-ilp64=true \
                     -Csetup-args=-Duse-g77-abi=true"
               ;;
 

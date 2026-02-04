@@ -22,7 +22,7 @@ WHEEL = r'/download/(?P<release>.*?)/(?P<name>.*?\.whl)'
 
 class Releases:
     def __init__(self):
-        self.url = 'https://api.github.com/repos/urob/numpy-mkl/releases'
+        self.url = 'https://api.github.com/repos/michael-denyer/numpy-mkl/releases'
 
     def fetch_releases(self, token=None):
         headers = self.headers(token=token)
