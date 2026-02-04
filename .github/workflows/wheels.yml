@@ -242,8 +242,10 @@ jobs:
         run: |
           mkdir -p wheelhouse
           plat="$(ldd --version | head -1 | awk '{ print $NF }' | tr '.' '_')_$(uname -m)"
+          # ILP64: Bundle MKL libs into wheel since PyPI mkl only has LP64
+          # This makes larger wheels but avoids runtime dependency issues
           uvx auditwheel repair "${{ env.SRC_DIR }}"/dist/*.whl -w wheelhouse \
-              --exclude 'libmkl*' --plat=manylinux_${plat}
+              --plat=manylinux_${plat}
         if: runner.os == 'linux'
 
       - name: Repair wheel (Windows)
@@ -260,9 +262,8 @@ jobs:
 
           # Set up test environment.
           uv venv testenv && source testenv/"${{ env.venv_bin }}"/activate
-          # Install mkl from PyPI (has ILP64 libs), then our ILP64 wheel
-          uv pip install mkl mkl-service
-          uv pip install wheelhouse/*.whl --no-deps
+          # ILP64 libs are bundled in wheel, no external mkl needed
+          uv pip install wheelhouse/*.whl
 
           case "${{ inputs.name }}" in
             numpy)
