@@ -261,8 +261,7 @@ jobs:
           # Set up test environment.
           uv venv testenv && source testenv/"${{ env.venv_bin }}"/activate
           # Install mkl from PyPI (has ILP64 libs), then our ILP64 wheel
-          # Note: urob's mkl-service is patched to detect mkl at runtime
-          uv pip install mkl mkl-service --index https://urob.github.io/numpy-mkl
+          uv pip install mkl mkl-service
           uv pip install wheelhouse/*.whl --no-deps
 
           case "${{ inputs.name }}" in
