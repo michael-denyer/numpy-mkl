@@ -215,7 +215,6 @@ jobs:
                     -Csetup-args=-Dlapack=mkl-dynamic-ilp64-seq \
                     -Csetup-args=-Duse-ilp64=true \
                     -Csetup-args=-Dblas-symbol-suffix=_64 \
-                    -Csetup-args=-Dlapack-symbol-suffix=_64 \
                     -Csetup-args=-Dallow-noblas=false \
                     -Csetup-args=-Dcpu-baseline=F16C \
                     -Csetup-args=-Dcpu-dispatch=AVX512_ICL"
@@ -229,7 +228,6 @@ jobs:
                     -Csetup-args=-Dlapack=mkl-dynamic-ilp64-seq \
                     -Csetup-args=-Duse-ilp64=true \
                     -Csetup-args=-Dblas-symbol-suffix=_64 \
-                    -Csetup-args=-Dlapack-symbol-suffix=_64 \
                     -Csetup-args=-Duse-g77-abi=true"
               ;;
 
