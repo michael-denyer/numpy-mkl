@@ -263,23 +263,19 @@ jobs:
 
       - name: Run tests
         run: |
-          # Make sure we don't pick up the development MKL libraries.
-          rm -rf "${{ env.MKL_DIR }}"
-
           # Set up test environment.
           uv venv testenv && source testenv/"${{ env.venv_bin }}"/activate
           # Install wheel with --no-deps to prevent PyPI pulling LP64 mkl/mkl-service
           # into the ILP64 test environment.
           uv pip install --no-deps wheelhouse/*.whl
 
-          # MKL runtime libs are bundled in numpy.libs/ by auditwheel but MKL's
-          # dispatcher loads them via dlopen (not ELF NEEDED), so auditwheel's RPATH
-          # patching doesn't help. Normally mkl-service handles this, but we can't
-          # install it without pulling LP64 deps from PyPI. Set LD_LIBRARY_PATH instead.
-          # Note: Can't use `python -c "import numpy"` here since numpy itself needs MKL.
+          # MKL runtime libs: auditwheel bundles directly-linked libs (.so NEEDED entries)
+          # into numpy.libs/, but MKL's dispatcher loads computational kernels like
+          # libmkl_def.so.2 via dlopen() at runtime. These aren't in NEEDED entries so
+          # auditwheel doesn't bundle them. Point LD_LIBRARY_PATH at the MKL install so
+          # the dispatcher can find them. (End users get this via mkl-service.)
           if [[ "${{ runner.os }}" == "Linux" ]]; then
-            site_pkgs="$(python -c "import site; print(site.getsitepackages()[0])")"
-            export LD_LIBRARY_PATH="${site_pkgs}/numpy.libs:${LD_LIBRARY_PATH:-}"
+            export LD_LIBRARY_PATH="${{ env.MKL_DIR }}/lib:${LD_LIBRARY_PATH:-}"
           fi
 
           case "${{ inputs.name }}" in
