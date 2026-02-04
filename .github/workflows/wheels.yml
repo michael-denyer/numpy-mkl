@@ -272,6 +272,15 @@ jobs:
           # into the ILP64 test environment.
           uv pip install --no-deps wheelhouse/*.whl
 
+          # MKL runtime libs are bundled in numpy.libs/ by auditwheel but MKL's
+          # dispatcher loads them via dlopen (not ELF NEEDED), so auditwheel's RPATH
+          # patching doesn't help. Normally mkl-service handles this, but we can't
+          # install it without pulling LP64 deps from PyPI. Set LD_LIBRARY_PATH instead.
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            numpy_libs="$(python -c "import numpy; print(numpy.__path__[0])")/../numpy.libs"
+            export LD_LIBRARY_PATH="${numpy_libs}:${LD_LIBRARY_PATH:-}"
+          fi
+
           case "${{ inputs.name }}" in
             numpy)
               uv pip install -r "${{ env.SRC_DIR }}"/requirements/test_requirements.txt
