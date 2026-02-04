@@ -64,7 +64,7 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.meta.outputs.matrix) }}
       fail-fast: false
-    continue-on-error: true
+    # Don't use continue-on-error: broken wheels would get released.
     defaults:
       run:
         shell: bash
@@ -207,9 +207,15 @@ jobs:
             numpy)
               # ILP64: Use 64-bit integer interface to support matrices >46k x 46k
               # mkl-dynamic-ilp64-seq uses sequential threading (simpler, avoids thread bugs)
+              # -Dblas-symbol-suffix=_64 forces _64-suffixed symbols (dsyevd_64_ not dsyevd_)
+              # so the linker can ONLY resolve to ILP64 libraries. Without this, auditwheel-
+              # bundled wheels may resolve unsuffixed symbols to LP64 and return garbage.
+              # This matches scipy's approach (scipy/meson.build:386-390).
               args="-Csetup-args=-Dblas=mkl-dynamic-ilp64-seq \
                     -Csetup-args=-Dlapack=mkl-dynamic-ilp64-seq \
                     -Csetup-args=-Duse-ilp64=true \
+                    -Csetup-args=-Dblas-symbol-suffix=_64 \
+                    -Csetup-args=-Dlapack-symbol-suffix=_64 \
                     -Csetup-args=-Dallow-noblas=false \
                     -Csetup-args=-Dcpu-baseline=F16C \
                     -Csetup-args=-Dcpu-dispatch=AVX512_ICL"
@@ -222,6 +228,8 @@ jobs:
               args="-Csetup-args=-Dblas=mkl-dynamic-ilp64-seq \
                     -Csetup-args=-Dlapack=mkl-dynamic-ilp64-seq \
                     -Csetup-args=-Duse-ilp64=true \
+                    -Csetup-args=-Dblas-symbol-suffix=_64 \
+                    -Csetup-args=-Dlapack-symbol-suffix=_64 \
                     -Csetup-args=-Duse-g77-abi=true"
               ;;
 
@@ -236,7 +244,7 @@ jobs:
               uv pip install setuptools cython
               ;;
           esac
-          uv build --wheel --index https://urob.github.io/numpy-mkl ${args}
+          uv build --wheel --index https://michael-denyer.github.io/numpy-mkl ${args}
 
       - name: Repair wheel (Linux)
         run: |
@@ -262,8 +270,9 @@ jobs:
 
           # Set up test environment.
           uv venv testenv && source testenv/"${{ env.venv_bin }}"/activate
-          # ILP64 libs are bundled in wheel, no external mkl needed
-          uv pip install wheelhouse/*.whl
+          # Install wheel with --no-deps to prevent PyPI pulling LP64 mkl/mkl-service
+          # into the ILP64 test environment.
+          uv pip install --no-deps wheelhouse/*.whl
 
           case "${{ inputs.name }}" in
             numpy)
@@ -275,9 +284,7 @@ jobs:
             scipy)
               # Only install essential test dependencies, mirroring official wheel builder.
               uv pip install pytest pytest-xdist threadpoolctl pooch hypothesis
-              # uv pip install -r "${{ env.SRC_DIR }}"/requirements/test.txt \
-              #     --index https://urob.github.io/numpy-mkl
-              python -c 'import sys; import scipy; sys.exit(not scipy.test())'
+              python tools/scipy_tests.py
               ;;
 
             mkl-service)
