@@ -132,6 +132,10 @@ jobs:
           cd "${{ env.SRC_DIR }}"
           git apply "${GITHUB_WORKSPACE}"/patches/${{ inputs.name }}/*.patch
 
+          # mkl-devel only ships mkl-sdl.pc (Single Dynamic Library config).
+          # scipy's meson.build also requires plain "mkl" for version checking.
+          cp "${PKG_CONFIG_PATH}/mkl-sdl.pc" "${PKG_CONFIG_PATH}/mkl.pc"
+
 
       - name: Add MKL to runtime dependencies
         working-directory: ${{ env.SRC_DIR }}
