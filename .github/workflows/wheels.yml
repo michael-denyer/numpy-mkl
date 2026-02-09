@@ -249,10 +249,11 @@ jobs:
               ;;
 
             scipy)
-              # Install ILP64 numpy from our own index first (scipy needs it at runtime).
-              # --no-deps prevents pulling LP64 mkl/mkl-service from PyPI.
+              # Install ILP64 numpy from our own index (scipy needs it at runtime).
+              # Use --index-url (not --extra-index-url) to ensure our ILP64 wheel is
+              # picked over PyPI's LP64 build. --no-deps prevents LP64 mkl contamination.
               uv pip install --no-deps numpy \
-                  --extra-index-url https://michael-denyer.github.io/numpy-mkl
+                  --index-url https://michael-denyer.github.io/numpy-mkl
               uv pip install pytest pytest-xdist pytest-timeout threadpoolctl pooch hypothesis
               python tools/scipy_tests.py
               ;;
