@@ -249,8 +249,11 @@ jobs:
               ;;
 
             scipy)
-              # Only install essential test dependencies, mirroring official wheel builder.
-              uv pip install pytest pytest-xdist threadpoolctl pooch hypothesis
+              # Install ILP64 numpy from our own index first (scipy needs it at runtime).
+              # --no-deps prevents pulling LP64 mkl/mkl-service from PyPI.
+              uv pip install --no-deps numpy \
+                  --extra-index-url https://michael-denyer.github.io/numpy-mkl
+              uv pip install pytest pytest-xdist pytest-timeout threadpoolctl pooch hypothesis
               python tools/scipy_tests.py
               ;;
 
