@@ -1,6 +1,8 @@
 # numpy-mkl-ilp64
 
-**ILP64 Fork** - This fork builds NumPy and SciPy with MKL's **ILP64 (64-bit integer)** interface,
+[![Build wheels](https://github.com/michael-denyer/numpy-mkl/actions/workflows/build_wheels.yml/badge.svg)](https://github.com/michael-denyer/numpy-mkl/actions/workflows/build_wheels.yml)
+
+**ILP64 Fork** - This fork builds NumPy with MKL's **ILP64 (64-bit integer)** interface,
 enabling eigendecomposition of matrices larger than 46k × 46k (the LP64 limit).
 
 > **Upstream**: [urob/numpy-mkl](https://github.com/urob/numpy-mkl) (LP64 version)
@@ -20,16 +22,15 @@ remove this limitation.
 
 ```bash
 # Databricks / pip
-pip install numpy scipy --extra-index-url https://michael-denyer.github.io/numpy-mkl --force-reinstall --upgrade
+pip install numpy --extra-index-url https://michael-denyer.github.io/numpy-mkl --force-reinstall --upgrade
 
 # uv
-uv add numpy scipy --index https://michael-denyer.github.io/numpy-mkl
+uv add numpy --index https://michael-denyer.github.io/numpy-mkl
 ```
 
 ## Compatibility Notes
 
 - **ILP64 wheels are NOT compatible with LP64 wheels** - don't mix them
-- All packages (numpy, scipy, mkl-service) must use the same interface
 - Performance is similar to LP64 for most operations
 
 ## Build Changes from Upstream
