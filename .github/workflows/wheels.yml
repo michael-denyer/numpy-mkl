@@ -204,6 +204,8 @@ jobs:
         run: |
           mkdir -p wheelhouse
           plat="$(ldd --version | head -1 | awk '{ print $NF }' | tr '.' '_')_$(uname -m)"
+          # auditwheel needs to locate MKL libs to bundle them into the wheel
+          export LD_LIBRARY_PATH="${{ env.MKL_DIR }}/lib:${LD_LIBRARY_PATH:-}"
           # ILP64: Bundle MKL libs into wheel since PyPI mkl only has LP64
           # This makes larger wheels but avoids runtime dependency issues
           uvx auditwheel repair "${{ env.SRC_DIR }}"/dist/*.whl -w wheelhouse \
