@@ -182,13 +182,13 @@ jobs:
           case "${{ inputs.name }}" in
             numpy)
               # ILP64: Use 64-bit integer interface to support matrices >46k x 46k
-              # mkl-dynamic-ilp64-seq uses sequential threading (simpler, avoids thread bugs)
+              # mkl-dynamic-ilp64-iomp uses Intel OpenMP for multi-threaded BLAS/LAPACK
               # -Dblas-symbol-suffix=_64 forces _64-suffixed symbols (dsyevd_64_ not dsyevd_)
               # so the linker can ONLY resolve to ILP64 libraries. Without this, auditwheel-
               # bundled wheels may resolve unsuffixed symbols to LP64 and return garbage.
               # This matches scipy's approach (scipy/meson.build:386-390).
-              args="-Csetup-args=-Dblas=mkl-dynamic-ilp64-seq \
-                    -Csetup-args=-Dlapack=mkl-dynamic-ilp64-seq \
+              args="-Csetup-args=-Dblas=mkl-dynamic-ilp64-iomp \
+                    -Csetup-args=-Dlapack=mkl-dynamic-ilp64-iomp \
                     -Csetup-args=-Duse-ilp64=true \
                     -Csetup-args=-Dblas-symbol-suffix=_64 \
                     -Csetup-args=-Dallow-noblas=false \
@@ -199,8 +199,8 @@ jobs:
             scipy)
               # ILP64: Use 64-bit integer interface for scipy as well
               # MSVC is unable to compile Pythran, use gcc or set -Duse-pythran=false.
-              args="-Csetup-args=-Dblas=mkl-dynamic-ilp64-seq \
-                    -Csetup-args=-Dlapack=mkl-dynamic-ilp64-seq \
+              args="-Csetup-args=-Dblas=mkl-dynamic-ilp64-iomp \
+                    -Csetup-args=-Dlapack=mkl-dynamic-ilp64-iomp \
                     -Csetup-args=-Duse-ilp64=true \
                     -Csetup-args=-Dblas-symbol-suffix=_64 \
                     -Csetup-args=-Duse-g77-abi=true"

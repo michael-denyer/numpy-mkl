@@ -37,8 +37,8 @@ uv add numpy scipy --index https://michael-denyer.github.io/numpy-mkl
 ```diff
 - -Csetup-args=-Dblas=mkl-sdl
 - -Csetup-args=-Dlapack=mkl-sdl
-+ -Csetup-args=-Dblas=mkl-dynamic-ilp64-seq
-+ -Csetup-args=-Dlapack=mkl-dynamic-ilp64-seq
++ -Csetup-args=-Dblas=mkl-dynamic-ilp64-iomp
++ -Csetup-args=-Dlapack=mkl-dynamic-ilp64-iomp
 + -Csetup-args=-Duse-ilp64=true
 ```
 
