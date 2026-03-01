@@ -23,12 +23,3 @@ jobs:
       force-build: true
       manylinux: true
     needs: mkl-service
-
-  scipy:
-    uses: ./.github/workflows/wheels.yml
-    with:
-      name: scipy
-      repo: scipy/scipy
-      force-build: true
-      manylinux: true
-    needs: [mkl-service, numpy]

@@ -6,11 +6,11 @@ on:
       name:
         required: true
         type: string
-        description: "Package to build (numpy, scipy)"
+        description: "Package to build (numpy, mkl-service)"
       repo:
         required: true
         type: string
-        description: "Repo to build (numpy, scipy)"
+        description: "Repo to build (numpy/numpy, IntelPython/mkl-service)"
       force-build:
         required: false
         type: boolean
@@ -133,7 +133,7 @@ jobs:
           git apply "${GITHUB_WORKSPACE}"/patches/${{ inputs.name }}/*.patch
 
           # mkl-devel only ships mkl-sdl.pc (Single Dynamic Library config).
-          # scipy's meson.build also requires plain "mkl" for version checking.
+          # meson.build requires plain "mkl" for version checking.
           cp "${PKG_CONFIG_PATH}/mkl-sdl.pc" "${PKG_CONFIG_PATH}/mkl.pc"
 
 
@@ -154,7 +154,6 @@ jobs:
           echo "" >>LICENSE.txt
           echo "----" >>LICENSE.txt
           echo "" >>LICENSE.txt
-          [[ "${{ inputs.name }}" == "scipy" ]] && cat LICENSES_bundled.txt >>LICENSE.txt
           cat "${GITHUB_WORKSPACE}/patches/LICENSE_MKL.txt" >>LICENSE.txt
         if: inputs.name != 'mkl-service'
 
@@ -168,11 +167,6 @@ jobs:
               # Tests for distutil require clang (Python < 3.12).
               [[ "$UV_PYTHON" =~ ^(cp310|cp311)$ ]] && dnf -y install clang || true
               ;&
-            # scipy)
-            #   # Test dependency gmpy2 hasn't released pre-build wheels for py314, building
-            #   # from scratch requires libmpc-devel.
-            #   [[ "$UV_PYTHON" =~ ^(cp314)$ ]] && dnf -y install libmpc-devel || true
-            #   ;&
           esac
         if: inputs.manylinux
 
@@ -186,7 +180,7 @@ jobs:
               # -Dblas-symbol-suffix=_64 forces _64-suffixed symbols (dsyevd_64_ not dsyevd_)
               # so the linker can ONLY resolve to ILP64 libraries. Without this, auditwheel-
               # bundled wheels may resolve unsuffixed symbols to LP64 and return garbage.
-              # This matches scipy's approach (scipy/meson.build:386-390).
+              # See scipy/meson.build:386-390 for similar approach.
               args="-Csetup-args=-Dblas=mkl-dynamic-ilp64-iomp \
                     -Csetup-args=-Dlapack=mkl-dynamic-ilp64-iomp \
                     -Csetup-args=-Duse-ilp64=true \
@@ -194,16 +188,6 @@ jobs:
                     -Csetup-args=-Dallow-noblas=false \
                     -Csetup-args=-Dcpu-baseline=F16C \
                     -Csetup-args=-Dcpu-dispatch=AVX512_ICL"
-              ;;
-
-            scipy)
-              # ILP64: Use 64-bit integer interface for scipy as well
-              # MSVC is unable to compile Pythran, use gcc or set -Duse-pythran=false.
-              args="-Csetup-args=-Dblas=mkl-dynamic-ilp64-iomp \
-                    -Csetup-args=-Dlapack=mkl-dynamic-ilp64-iomp \
-                    -Csetup-args=-Duse-ilp64=true \
-                    -Csetup-args=-Dblas-symbol-suffix=_64 \
-                    -Csetup-args=-Duse-g77-abi=true"
               ;;
 
             'mkl-service')
@@ -246,16 +230,6 @@ jobs:
               uv pip install -r "${{ env.SRC_DIR }}"/requirements/test_requirements.txt
               uv pip install threadpoolctl
               python tools/numpy_tests.py
-              ;;
-
-            scipy)
-              # Install ILP64 numpy from our own index (scipy needs it at runtime).
-              # Use --index-url (not --extra-index-url) to ensure our ILP64 wheel is
-              # picked over PyPI's LP64 build. --no-deps prevents LP64 mkl contamination.
-              uv pip install --no-deps numpy \
-                  --index-url https://michael-denyer.github.io/numpy-mkl
-              uv pip install pytest pytest-xdist pytest-timeout threadpoolctl pooch hypothesis
-              python tools/scipy_tests.py
               ;;
 
             mkl-service)

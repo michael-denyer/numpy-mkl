@@ -13,13 +13,13 @@ It is recommended to use `uv` or `pip` to automatically handle all dependencies.
 ```sh
 # Run this from project directory
 uv init
-uv add numpy scipy --index https://urob.github.io/numpy-mkl
+uv add numpy --index https://urob.github.io/numpy-mkl
 ```
 
 **pip**
 
 ```sh
-pip install numpy scipy --extra-index-url https://urob.github.io/numpy-mkl
+pip install numpy --extra-index-url https://urob.github.io/numpy-mkl
 ```
 
 **Manual installation**
