@@ -246,7 +246,7 @@ jobs:
           # This makes larger wheels but avoids runtime dependency issues
           uvx auditwheel repair "${{ env.SRC_DIR }}"/dist/*.whl -w wheelhouse \
               --plat=manylinux_${plat}
-        if: runner.os == 'linux'
+        if: runner.os == 'Linux'
 
       - name: Show wheel dependencies (Windows)
         if: runner.os == 'Windows'
