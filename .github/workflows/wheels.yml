@@ -248,6 +248,21 @@ jobs:
               --plat=manylinux_${plat}
         if: runner.os == 'linux'
 
+      - name: Show wheel dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          uvx delvewheel show "${{ env.SRC_DIR }}"/dist/*.whl \
+              --add-path "${{ env.MKL_DIR }}/Library/bin"
+
+      - name: Repair wheel (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          mkdir -p wheelhouse
+          uvx delvewheel repair "${{ env.SRC_DIR }}"/dist/*.whl -w wheelhouse \
+              --add-path "${{ env.MKL_DIR }}/Library/bin" \
+              --exclude mkl_rt.2.dll \
+              --exclude libsf_error_state.dll
+
       - name: Run tests
         run: |
           # Set up test environment.
