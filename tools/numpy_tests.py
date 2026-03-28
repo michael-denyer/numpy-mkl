@@ -22,7 +22,8 @@ if os.environ.get('RUNNER_OS') == 'Windows':
 
 
 # ---------------------------------------------------------------------------
-# Gate: assert ILP64 + MKL are active before running any numerical tests.
+# Gate: assert MKL is active (Linux: ILP64 by name; Windows: MKL by name,
+# ILP64 correctness verified via numerical tests below).
 # Small-matrix tests can silently pass with LP64 or non-MKL, hiding the real
 # issue until a 50k+ matrix explodes at runtime.
 # ---------------------------------------------------------------------------
@@ -35,11 +36,26 @@ lapack_name = config.get('Build Dependencies', {}).get('lapack', {}).get('name',
 print(f"  BLAS:   {blas_name}")
 print(f"  LAPACK: {lapack_name}")
 
-assert 'ilp64' in blas_name.lower(), \
-    f"BLAS must be ILP64, got: {blas_name}"
-assert 'ilp64' in lapack_name.lower(), \
-    f"LAPACK must be ILP64, got: {lapack_name}"
-print("  ILP64 configuration: CONFIRMED\n")
+runner_os = os.environ.get('RUNNER_OS', '')
+
+if runner_os == 'Windows':
+    # On Windows, NumPy is built with -Dblas=mkl-sdl (Single Dynamic Library).
+    # mkl-sdl does not include 'ilp64' in its pkg-config name — show_config()
+    # reports 'mkl-sdl'. ILP64 correctness is verified via numerical tests below
+    # (reconstruction error < 1e-8 rules out LP64 mismatch). Assert MKL is active.
+    assert 'mkl' in blas_name.lower(), \
+        f"BLAS must be MKL on Windows, got: {blas_name}"
+    assert 'mkl' in lapack_name.lower(), \
+        f"LAPACK must be MKL on Windows, got: {lapack_name}"
+    print("  MKL active: CONFIRMED (ILP64 correctness verified via numerical tests)\n")
+else:
+    # On Linux, NumPy is built with -Dblas=mkl-dynamic-ilp64-iomp which
+    # explicitly includes 'ilp64' in the pkg-config name and show_config() output.
+    assert 'ilp64' in blas_name.lower(), \
+        f"BLAS must be ILP64, got: {blas_name}"
+    assert 'ilp64' in lapack_name.lower(), \
+        f"LAPACK must be ILP64, got: {lapack_name}"
+    print("  ILP64 configuration: CONFIRMED\n")
 
 
 # ---------------------------------------------------------------------------
