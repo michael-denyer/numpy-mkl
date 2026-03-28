@@ -276,7 +276,9 @@ jobs:
           # libmkl_def.so.2 via dlopen() at runtime. These aren't in NEEDED entries so
           # auditwheel doesn't bundle them. Point LD_LIBRARY_PATH at the MKL install so
           # the dispatcher can find them. (End users get this via mkl-service.)
-          export LD_LIBRARY_PATH="${{ env.MKL_DIR }}/lib:${LD_LIBRARY_PATH:-}"
+          if [[ "${{ runner.os }}" != "Windows" ]]; then
+            export LD_LIBRARY_PATH="${{ env.MKL_DIR }}/lib:${LD_LIBRARY_PATH:-}"
+          fi
 
           case "${{ inputs.name }}" in
             numpy)
