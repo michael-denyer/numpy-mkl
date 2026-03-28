@@ -89,13 +89,23 @@ jobs:
           # Need this since pyproject.toml doesn't apply to $SRC_DIR.
           echo "UV_PYTHON_PREFERENCE=only-managed" >>$GITHUB_ENV
 
-          echo "venv_bin=bin" >>$GITHUB_ENV
-
           # Move src to avoid pyproject conflicts.
           mv src ../../ && echo "SRC_DIR=${GITHUB_WORKSPACE}/../../src" >>$GITHUB_ENV
 
           # Keep MKL directory short as it ends up in the final build.
           echo "MKL_DIR=$(realpath "${GITHUB_WORKSPACE}"/../../mkl)" >>$GITHUB_ENV
+
+      - name: Prepare environment (Linux)
+        if: runner.os != 'Windows'
+        run: |
+          echo "venv_bin=bin" >>$GITHUB_ENV
+          echo "MKLROOT=${{ env.MKL_DIR }}" >>$GITHUB_ENV
+
+      - name: Prepare environment (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo "venv_bin=Scripts" >>$GITHUB_ENV
+          echo "MKLROOT=${{ env.MKL_DIR }}/Library" >>$GITHUB_ENV
 
       - name: Set up python
         uses: astral-sh/setup-uv@681c641aba71e4a1c380be3ab5e12ad51f415867 # v7.1.6
@@ -103,6 +113,11 @@ jobs:
           python-version: ${{ matrix.python_version }}
           version-file: "pyproject.toml"
           enable-cache: false
+
+      - name: Remove Strawberry Perl from PATH
+        if: runner.os == 'Windows'
+        run: |
+          echo "PATH=$(echo "$PATH" | tr ':' '\n' | grep -v Strawberry | tr '\n' ':')" >>$GITHUB_ENV
 
       - name: Install MKL libraries
         run: |
@@ -122,7 +137,9 @@ jobs:
           cat "$(python tools/get_file_in_pkg LICENSE.txt --pkg mkl-devel)" \
               >>"${GITHUB_WORKSPACE}/patches/LICENSE_MKL.txt"
 
-          # Add .so -> .so.2 symlinks to fix linking for mkl-service.
+      - name: Add .so -> .so.2 symlinks (Linux only)
+        if: runner.os == 'Linux'
+        run: |
           cd "${{ env.MKL_DIR }}"/lib
           for i in $( ls libmkl*.so.2 ); do ln -s $i ${i%.*}; done
 
