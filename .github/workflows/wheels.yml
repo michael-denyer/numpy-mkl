@@ -191,6 +191,10 @@ jobs:
           esac
         if: inputs.manylinux
 
+      - name: Set up MSVC environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Build wheel
         working-directory: ${{ env.SRC_DIR }}
         run: |
@@ -202,12 +206,11 @@ jobs:
                     -Csetup-args=-Dcpu-dispatch=AVX512_ICL"
 
               if [[ "${{ runner.os }}" == "Windows" ]]; then
-                # BLD-01: --vsenv forces MSVC over MinGW
+                # BLD-01: MSVC environment activated by ilammy/msvc-dev-cmd above
                 # BLD-02+04: mkl-sdl is the only MKL .pc file shipped by mkl-devel on Windows
                 args="${args} \
                       -Csetup-args=-Dblas=mkl-sdl \
-                      -Csetup-args=-Dlapack=mkl-sdl \
-                      -Csetup-args=--vsenv"
+                      -Csetup-args=-Dlapack=mkl-sdl"
               else
                 # Linux: ILP64 with 64-bit integer interface and Intel OpenMP
                 # BLD-03: -Duse-ilp64=true and -Dblas-symbol-suffix=_64 force ILP64
