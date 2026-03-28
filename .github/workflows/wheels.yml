@@ -119,6 +119,10 @@ jobs:
         run: |
           echo "PATH=$(echo "$PATH" | tr ':' '\n' | grep -v Strawberry | tr '\n' ':')" >>$GITHUB_ENV
 
+      - name: Install build dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: choco install -y --no-progress --stoponfirstfailure --checksum 6004DF17818F5A6DBF19CB335CC92702 pkgconfiglite
+
       - name: Install MKL libraries
         run: |
           uv venv "${{ env.MKL_DIR }}"
@@ -152,7 +156,7 @@ jobs:
           # mkl-devel only ships mkl-sdl.pc (Single Dynamic Library config).
           # meson.build requires plain "mkl" for version checking.
           cp "${PKG_CONFIG_PATH}/mkl-sdl.pc" "${PKG_CONFIG_PATH}/mkl.pc"
-
+          ls -la "${PKG_CONFIG_PATH}/mkl.pc"
 
       - name: Add MKL to runtime dependencies
         working-directory: ${{ env.SRC_DIR }}
