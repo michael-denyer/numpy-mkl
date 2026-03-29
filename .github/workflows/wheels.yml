@@ -253,10 +253,12 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           mkdir -p wheelhouse
+          # Bundle mkl_rt.2.dll — it's the SDL (Single Dynamic Library) that numpy
+          # links against directly on Windows. Unlike Linux where auditwheel bundles
+          # many .so files and the dispatcher is separate, on Windows mkl_rt.2.dll IS
+          # the compute library. Excluding it leaves numpy unable to import.
           uvx delvewheel repair "${{ env.SRC_DIR }}"/dist/*.whl -w wheelhouse \
-              --add-path "${{ env.MKL_DIR }}/Library/bin" \
-              --exclude mkl_rt.2.dll \
-              --exclude libsf_error_state.dll
+              --add-path "${{ env.MKL_DIR }}/Library/bin"
 
       - name: Run tests
         run: |
