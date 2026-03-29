@@ -260,27 +260,17 @@ jobs:
           uvx delvewheel repair "${{ env.SRC_DIR }}"/dist/*.whl -w wheelhouse \
               --add-path "${{ env.MKL_DIR }}/Library/bin"
 
-      - name: Add MKL to runtime library path
-        run: |
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            # Windows: mkl_rt.2.dll (bundled by delvewheel) dispatches to computational
-            # kernels like mkl_intel_thread.2.dll via LoadLibrary(). Add MKL bin dir to
-            # PATH via GITHUB_PATH so it persists for the Run tests step.
-            echo "${{ env.MKL_DIR }}/Library/bin" >>$GITHUB_PATH
-          else
-            # Linux: auditwheel bundles directly-linked libs into numpy.libs/, but MKL's
-            # dispatcher loads computational kernels via dlopen() at runtime. Point
-            # LD_LIBRARY_PATH at the MKL install so the dispatcher can find them.
-            echo "LD_LIBRARY_PATH=${{ env.MKL_DIR }}/lib:${LD_LIBRARY_PATH:-}" >>$GITHUB_ENV
-          fi
+      - name: Clean up build-time MKL
+        run: rm -rf "${{ env.MKL_DIR }}"
 
       - name: Run tests
         run: |
           # Set up test environment.
           uv venv testenv && source testenv/"${{ env.venv_bin }}"/activate
-          # Install wheel with --no-deps to prevent PyPI pulling LP64 mkl/mkl-service
-          # into the ILP64 test environment.
-          uv pip install --no-deps wheelhouse/*.whl
+          # Install wheel with deps from our index. This pulls mkl + mkl-service as
+          # runtime dependencies, providing the MKL kernel DLLs (.dll on Windows,
+          # .so on Linux) that the dispatcher (mkl_rt) loads at runtime.
+          uv pip install wheelhouse/*.whl --index https://michael-denyer.github.io/numpy-mkl
 
           case "${{ inputs.name }}" in
             numpy)
