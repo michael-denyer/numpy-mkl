@@ -273,7 +273,12 @@ jobs:
           # libmkl_def.so.2 via dlopen() at runtime. These aren't in NEEDED entries so
           # auditwheel doesn't bundle them. Point LD_LIBRARY_PATH at the MKL install so
           # the dispatcher can find them. (End users get this via mkl-service.)
-          if [[ "${{ runner.os }}" != "Windows" ]]; then
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            # Windows: mkl_rt.2.dll (bundled by delvewheel) dispatches to computational
+            # kernels like mkl_intel_thread.2.dll via LoadLibrary(). Add MKL bin dir to
+            # PATH so the dispatcher can find them. (End users get this via mkl-service.)
+            export PATH="${{ env.MKL_DIR }}/Library/bin:${PATH}"
+          else
             export LD_LIBRARY_PATH="${{ env.MKL_DIR }}/lib:${LD_LIBRARY_PATH:-}"
           fi
 
