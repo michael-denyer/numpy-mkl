@@ -260,28 +260,12 @@ jobs:
           uvx delvewheel repair "${{ env.SRC_DIR }}"/dist/*.whl -w wheelhouse \
               --add-path "${{ env.MKL_DIR }}/Library/bin"
 
-      - name: Set MKL runtime library path
+      - name: Set MKL runtime library path (Linux)
+        if: runner.os == 'Linux'
         run: |
-          # MKL runtime: the dispatcher (mkl_rt.2.dll / libmkl_rt.so) loads
-          # computational kernels (mkl_intel_thread, mkl_core, etc.) at runtime.
-          # Set via GITHUB_ENV/GITHUB_PATH so changes persist to the next step
-          # at the OS level (bash export doesn't affect Windows LoadLibrary).
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            echo "${{ env.MKL_DIR }}/Library/bin" >>$GITHUB_PATH
-          else
-            echo "LD_LIBRARY_PATH=${{ env.MKL_DIR }}/lib:${LD_LIBRARY_PATH:-}" >>$GITHUB_ENV
-          fi
-
-      - name: Verify MKL runtime DLLs
-        if: runner.os == 'Windows'
-        run: |
-          echo "=== MKL_DIR contents ==="
-          ls "${{ env.MKL_DIR }}/Library/bin/"mkl_*.dll 2>/dev/null || echo "No MKL DLLs in Library/bin"
-          ls "${{ env.MKL_DIR }}/Library/bin/"mkl_intel_thread* 2>/dev/null || echo "mkl_intel_thread not in Library/bin"
-          ls "${{ env.MKL_DIR }}/"Scripts/mkl_*.dll 2>/dev/null || echo "No MKL DLLs in Scripts"
-          find "${{ env.MKL_DIR }}" -name "mkl_intel_thread*" 2>/dev/null || echo "mkl_intel_thread not found anywhere in MKL_DIR"
-          echo "=== PATH check ==="
-          echo "$PATH" | tr ':' '\n' | grep -i mkl || echo "No mkl in PATH"
+          # Linux: auditwheel bundles directly-linked libs into numpy.libs/, but
+          # MKL's dispatcher loads computational kernels via dlopen() at runtime.
+          echo "LD_LIBRARY_PATH=${{ env.MKL_DIR }}/lib:${LD_LIBRARY_PATH:-}" >>$GITHUB_ENV
 
       - name: Run tests
         run: |
