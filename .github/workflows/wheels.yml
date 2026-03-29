@@ -114,11 +114,6 @@ jobs:
           version-file: "pyproject.toml"
           enable-cache: false
 
-      - name: Remove Strawberry Perl from PATH
-        if: runner.os == 'Windows'
-        run: |
-          echo "PATH=$(echo "$PATH" | tr ':' '\n' | grep -v Strawberry | tr '\n' ':')" >>$GITHUB_ENV
-
       - name: Install build dependencies (Windows)
         if: runner.os == 'Windows'
         run: choco install -y --no-progress --stoponfirstfailure --checksum 6004DF17818F5A6DBF19CB335CC92702 pkgconfiglite
@@ -191,10 +186,6 @@ jobs:
           esac
         if: inputs.manylinux
 
-      - name: Set up MSVC environment
-        if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
-
       - name: Build wheel
         working-directory: ${{ env.SRC_DIR }}
         run: |
@@ -206,11 +197,12 @@ jobs:
                     -Csetup-args=-Dcpu-dispatch=AVX512_ICL"
 
               if [[ "${{ runner.os }}" == "Windows" ]]; then
-                # BLD-01: MSVC environment activated by ilammy/msvc-dev-cmd above
+                # BLD-01: --vsenv activates MSVC developer environment via vcvarsall.bat
                 # BLD-02+04: mkl-sdl is the only MKL .pc file shipped by mkl-devel on Windows
                 args="${args} \
                       -Csetup-args=-Dblas=mkl-sdl \
-                      -Csetup-args=-Dlapack=mkl-sdl"
+                      -Csetup-args=-Dlapack=mkl-sdl \
+                      -Csetup-args=--vsenv"
               else
                 # Linux: ILP64 with 64-bit integer interface and Intel OpenMP
                 # BLD-03: -Duse-ilp64=true and -Dblas-symbol-suffix=_64 force ILP64
