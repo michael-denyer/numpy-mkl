@@ -260,17 +260,22 @@ jobs:
           uvx delvewheel repair "${{ env.SRC_DIR }}"/dist/*.whl -w wheelhouse \
               --add-path "${{ env.MKL_DIR }}/Library/bin"
 
-      - name: Clean up build-time MKL
-        run: rm -rf "${{ env.MKL_DIR }}"
-
       - name: Run tests
         run: |
           # Set up test environment.
           uv venv testenv && source testenv/"${{ env.venv_bin }}"/activate
-          # Install wheel with deps from our index. This pulls mkl + mkl-service as
-          # runtime dependencies, providing the MKL kernel DLLs (.dll on Windows,
-          # .so on Linux) that the dispatcher (mkl_rt) loads at runtime.
-          uv pip install wheelhouse/*.whl --index https://michael-denyer.github.io/numpy-mkl
+          # Install wheel with --no-deps to prevent pulling mkl-service (no Windows
+          # wheel available on our index yet).
+          uv pip install --no-deps wheelhouse/*.whl
+
+          # MKL runtime: the dispatcher (mkl_rt.2.dll / libmkl_rt.so) loads
+          # computational kernels (mkl_intel_thread, mkl_core, etc.) at runtime.
+          # Point the library search path at the MKL install so it can find them.
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            export PATH="${{ env.MKL_DIR }}/Library/bin:${PATH}"
+          else
+            export LD_LIBRARY_PATH="${{ env.MKL_DIR }}/lib:${LD_LIBRARY_PATH:-}"
+          fi
 
           case "${{ inputs.name }}" in
             numpy)
