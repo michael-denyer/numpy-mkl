@@ -11,14 +11,21 @@ import sys
 import traceback
 from pathlib import Path
 
-import numpy as np
-
-np.show_config()
-
 if os.environ.get('RUNNER_OS') == 'Windows':
+    # Register MKL DLL directory before importing numpy. The mkl pip package
+    # installs DLLs to {venv}/Library/bin/ (conda-style layout). Python 3.8+
+    # doesn't search PATH for DLLs, so we must register explicitly.
+    mkl_bin = Path(sys.prefix) / 'Library' / 'bin'
+    if mkl_bin.is_dir():
+        os.add_dll_directory(str(mkl_bin))
+
     # GH 20391
     libs = Path(sys.prefix) / 'libs'
     libs.mkdir(parents=True, exist_ok=True)
+
+import numpy as np
+
+np.show_config()
 
 
 # ---------------------------------------------------------------------------
