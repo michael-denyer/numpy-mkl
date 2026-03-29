@@ -11,23 +11,14 @@ import sys
 import traceback
 from pathlib import Path
 
-# Windows DLL loading: Python 3.8+ no longer searches PATH for DLLs.
-# MKL's dispatcher (mkl_rt.2.dll) loads computational kernels like
-# mkl_intel_thread.2.dll via LoadLibrary. We must register the MKL bin
-# directory before importing numpy so the kernels are discoverable.
-if os.environ.get('RUNNER_OS') == 'Windows':
-    mkl_dir = os.environ.get('MKL_DIR', '')
-    mkl_bin = os.path.join(mkl_dir, 'Library', 'bin')
-    if os.path.isdir(mkl_bin):
-        os.add_dll_directory(mkl_bin)
-
-    # GH 20391
-    libs = Path(sys.prefix) / 'libs'
-    libs.mkdir(parents=True, exist_ok=True)
-
 import numpy as np
 
 np.show_config()
+
+if os.environ.get('RUNNER_OS') == 'Windows':
+    # GH 20391
+    libs = Path(sys.prefix) / 'libs'
+    libs.mkdir(parents=True, exist_ok=True)
 
 
 # ---------------------------------------------------------------------------

@@ -253,12 +253,14 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           mkdir -p wheelhouse
-          # Bundle mkl_rt.2.dll — it's the SDL (Single Dynamic Library) that numpy
-          # links against directly on Windows. Unlike Linux where auditwheel bundles
-          # many .so files and the dispatcher is separate, on Windows mkl_rt.2.dll IS
-          # the compute library. Excluding it leaves numpy unable to import.
+          # Exclude mkl_rt.2.dll — MKL runtime DLLs are provided by the mkl pip
+          # package (installed separately in the test step). Bundling mkl_rt into the
+          # wheel causes LoadLibrary failures because its kernel deps (mkl_intel_thread
+          # etc.) aren't bundled alongside it.
           uvx delvewheel repair "${{ env.SRC_DIR }}"/dist/*.whl -w wheelhouse \
-              --add-path "${{ env.MKL_DIR }}/Library/bin"
+              --add-path "${{ env.MKL_DIR }}/Library/bin" \
+              --exclude mkl_rt.2.dll \
+              --exclude libsf_error_state.dll
 
       - name: Set MKL runtime library path (Linux)
         if: runner.os == 'Linux'
@@ -274,6 +276,10 @@ jobs:
           # Install wheel with --no-deps to prevent pulling mkl-service (no Windows
           # wheel available on our index yet).
           uv pip install --no-deps wheelhouse/*.whl
+          # Install MKL runtime package — provides mkl_rt.2.dll, mkl_intel_thread.2.dll,
+          # and other kernel DLLs. numpy's _distributor_init.py registers the DLL
+          # directory automatically on import.
+          uv pip install mkl>="${{ env.MKL_VERSION }}"
 
           case "${{ inputs.name }}" in
             numpy)
