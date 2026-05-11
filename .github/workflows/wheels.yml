@@ -231,7 +231,13 @@ jobs:
               ;;
 
             'mkl-service')
-              export MKLROOT="${{ env.MKL_DIR }}"
+              # mkl-service's setup.py looks at $MKLROOT/include and
+              # $MKLROOT/lib. On Linux that's $MKL_DIR; on Windows the headers
+              # and libs live one level deeper at $MKL_DIR/Library.
+              case "${{ runner.os }}" in
+                Linux) export MKLROOT="${{ env.MKL_DIR }}" ;;
+                Windows) export MKLROOT="${{ env.MKL_DIR }}/Library" ;;
+              esac
               export CFLAGS="${CFLAGS} -fno-fast-math"
               args="--no-build-isolation"
               uv venv buildenv && source buildenv/"${{ env.venv_bin }}"/activate
