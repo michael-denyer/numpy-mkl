@@ -120,11 +120,16 @@ jobs:
 
       - name: Install MKL libraries
         run: |
+          # Pin mkl-devel to the same major year as the upstream release being
+          # built. Prevents picking up future MKL majors with breaking layout
+          # changes (e.g. mkl 2026.0 bumped libmkl_rt.so.2 -> libmkl_rt.so.3).
+          RELEASE_YEAR=$(git -C "${{ env.SRC_DIR }}" log -1 --format=%cd --date=format:%Y)
+
           uv venv "${{ env.MKL_DIR }}"
           source "${{ env.MKL_DIR }}/${{ env.venv_bin }}"/activate
-          uv pip install mkl-devel
+          uv pip install "mkl-devel<$((RELEASE_YEAR + 1)).0.0"
 
-          # Get MKL version.
+          # Get exact MKL version.
           echo "MKL_VERSION=$(uv pip show mkl | grep '^Version' | sed 's/Version: //')" \
               >>$GITHUB_ENV
 
@@ -136,11 +141,15 @@ jobs:
           cat "$(python tools/get_file_in_pkg LICENSE.txt --pkg mkl-devel)" \
               >>"${GITHUB_WORKSPACE}/patches/LICENSE_MKL.txt"
 
-      - name: Add .so -> .so.2 symlinks (Linux only)
+      - name: Add .so -> .so.* symlinks (Linux only)
         if: runner.os == 'Linux'
         run: |
+          # The linker resolves -lmkl_rt by looking for libmkl_rt.so. mkl wheels
+          # ship only versioned filenames (libmkl_rt.so.2 in 2025.x, .so.3 in
+          # 2026.x), so create unversioned symlinks for whatever the wheel
+          # actually shipped.
           cd "${{ env.MKL_DIR }}"/lib
-          for i in $( ls libmkl*.so.2 ); do ln -s $i ${i%.*}; done
+          for i in libmkl*.so.*; do ln -s $i ${i%.*}; done
 
       - name: Apply patches
         run: |
@@ -184,7 +193,7 @@ jobs:
               [[ "$UV_PYTHON" =~ ^(cp310|cp311)$ ]] && dnf -y install clang || true
               ;&
           esac
-        if: inputs.manylinux
+        if: inputs.manylinux && runner.os == 'Linux'
 
       - name: Build wheel
         working-directory: ${{ env.SRC_DIR }}
@@ -253,13 +262,14 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           mkdir -p wheelhouse
-          # Exclude mkl_rt.2.dll — MKL runtime DLLs are provided by the mkl pip
-          # package (installed separately in the test step). Bundling mkl_rt into the
-          # wheel causes LoadLibrary failures because its kernel deps (mkl_intel_thread
-          # etc.) aren't bundled alongside it.
+          # Exclude mkl_rt.*.dll — MKL runtime DLLs are provided by the mkl pip
+          # package (installed separately in the test step). Bundling mkl_rt
+          # into the wheel causes LoadLibrary failures because its kernel deps
+          # (mkl_intel_thread etc.) aren't bundled alongside it. Glob covers
+          # both mkl_rt.2.dll (mkl 2025.x) and mkl_rt.3.dll (mkl 2026.x).
           uvx delvewheel repair "${{ env.SRC_DIR }}"/dist/*.whl -w wheelhouse \
               --add-path "${{ env.MKL_DIR }}/Library/bin" \
-              --exclude mkl_rt.2.dll \
+              --exclude "mkl_rt.*.dll" \
               --exclude libsf_error_state.dll
 
       - name: Set MKL runtime library path (Linux)
