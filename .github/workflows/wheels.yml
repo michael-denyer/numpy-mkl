@@ -166,11 +166,12 @@ jobs:
         working-directory: ${{ env.SRC_DIR }}
         run: |
           # Pin runtime library to the exact version used for compiling.
+          # --frozen skips resolution: resolving would build the project (its
+          # version is dynamic) before the build environment is set up.
           if [[ "${{ inputs.name }}" == "mkl-service" ]]; then
-            # MKLROOT must be set, even with --no-sync.
-            MKLROOT="${{ env.MKL_DIR }}" uv add --no-sync mkl>="${{ env.MKL_VERSION }}"
+            uv add --frozen "mkl>=${{ env.MKL_VERSION }}"
           else
-            uv add --no-sync mkl>="${{ env.MKL_VERSION }}" mkl-service
+            uv add --frozen "mkl>=${{ env.MKL_VERSION }}" mkl-service
           fi
 
       - name: Add MKL licence
@@ -201,7 +202,8 @@ jobs:
           case "${{ inputs.name }}" in
             numpy)
               # Shared args (all platforms)
-              args="-Csetup-args=-Dallow-noblas=false \
+              args="--index https://michael-denyer.github.io/numpy-mkl \
+                    -Csetup-args=-Dallow-noblas=false \
                     -Csetup-args=-Dcpu-baseline=F16C \
                     -Csetup-args=-Dcpu-dispatch=AVX512_ICL"
 
@@ -231,20 +233,23 @@ jobs:
               ;;
 
             'mkl-service')
-              # mkl-service's setup.py looks at $MKLROOT/include and
-              # $MKLROOT/lib. On Linux that's $MKL_DIR; on Windows the headers
-              # and libs live one level deeper at $MKL_DIR/Library.
-              case "${{ runner.os }}" in
-                Linux) export MKLROOT="${{ env.MKL_DIR }}" ;;
-                Windows) export MKLROOT="${{ env.MKL_DIR }}/Library" ;;
-              esac
+              # mkl-service >=2.8.0 builds with meson-python and discovers MKL
+              # via cmake: dependency('MKL', method: 'cmake'). CMAKE_PREFIX_PATH
+              # locates MKLConfig.cmake in the pinned MKL install; MKLROOT (set
+              # per-OS in Prepare environment) guides its internal lib search.
+              export CMAKE_PREFIX_PATH="${MKLROOT}"
               export CFLAGS="${CFLAGS} -fno-fast-math"
-              args="--no-build-isolation"
-              uv venv buildenv && source buildenv/"${{ env.venv_bin }}"/activate
-              uv pip install setuptools cython
+              # build-system.requires pulls mkl-devel unpinned into the
+              # isolated build env; constrain it to the compile-time version.
+              echo "mkl-devel==${{ env.MKL_VERSION }}" >"${GITHUB_WORKSPACE}/build-constraints.txt"
+              args="--build-constraints=${GITHUB_WORKSPACE}/build-constraints.txt"
+              if [[ "${{ runner.os }}" == "Windows" ]]; then
+                # --vsenv activates the MSVC developer environment (see BLD-01).
+                args="${args} -Csetup-args=--vsenv"
+              fi
               ;;
           esac
-          uv build --wheel --index https://michael-denyer.github.io/numpy-mkl ${args}
+          uv build --wheel ${args}
 
       - name: Repair wheel (Linux)
         run: |
