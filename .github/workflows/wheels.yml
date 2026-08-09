@@ -202,7 +202,8 @@ jobs:
           case "${{ inputs.name }}" in
             numpy)
               # Shared args (all platforms)
-              args="-Csetup-args=-Dallow-noblas=false \
+              args="--index https://michael-denyer.github.io/numpy-mkl \
+                    -Csetup-args=-Dallow-noblas=false \
                     -Csetup-args=-Dcpu-baseline=F16C \
                     -Csetup-args=-Dcpu-dispatch=AVX512_ICL"
 
@@ -248,7 +249,7 @@ jobs:
               fi
               ;;
           esac
-          uv build --wheel --index https://michael-denyer.github.io/numpy-mkl ${args}
+          uv build --wheel ${args}
 
       - name: Repair wheel (Linux)
         run: |
