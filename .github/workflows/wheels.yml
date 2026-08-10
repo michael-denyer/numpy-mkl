@@ -171,7 +171,9 @@ jobs:
           if [[ "${{ inputs.name }}" == "mkl-service" ]]; then
             uv add --frozen "mkl>=${{ env.MKL_VERSION }}"
           else
-            uv add --frozen "mkl>=${{ env.MKL_VERSION }}" mkl-service
+            # mkl-service floor: 2.8.0 is the first version with Windows
+            # wheels on our index.
+            uv add --frozen "mkl>=${{ env.MKL_VERSION }}" "mkl-service>=2.8.0"
           fi
 
       - name: Add MKL licence
@@ -294,8 +296,9 @@ jobs:
         run: |
           # Set up test environment.
           uv venv testenv && source testenv/"${{ env.venv_bin }}"/activate
-          # Install wheel with --no-deps to prevent pulling mkl-service (no Windows
-          # wheel available on our index yet).
+          # --no-deps keeps the test environment exact: mkl is pinned below,
+          # and mkl-service would otherwise resolve from PyPI (upstream's
+          # build), not from our index.
           uv pip install --no-deps wheelhouse/*.whl
           # Install MKL runtime package — provides mkl_rt.2.dll, mkl_intel_thread.2.dll,
           # and other kernel DLLs. numpy's _distributor_init.py registers the DLL
