@@ -13,18 +13,18 @@ It is recommended to use `uv` or `pip` to automatically handle all dependencies.
 ```sh
 # Run this from project directory
 uv init
-uv add numpy scipy --index https://urob.github.io/numpy-mkl
+uv add numpy --index https://michael-denyer.github.io/numpy-mkl
 ```
 
 **pip**
 
 ```sh
-pip install numpy scipy --index-url https://urob.github.io/numpy-mkl
+pip install numpy scipy --index-url https://michael-denyer.github.io/numpy-mkl
 ```
 
 **Manual installation**
 
-Current wheels for all packages and versions can be [downloaded here](https://urob.github.io/numpy-mkl/). Attached below are *newly* built wheels only.
+Current wheels for all packages and versions can be [downloaded here](https://michael-denyer.github.io/numpy-mkl/). Attached below are *newly* built wheels only.
 
 Manual installs must install compatible versions of `mkl`, `mkl-service`, and their indirect dependencies. For maximum compatibility, it is recommended to install `mkl-service` from this repository, which has been patched to automatically detect and load the `mkl` library whenever `numpy` or `scipy` are imported.
 

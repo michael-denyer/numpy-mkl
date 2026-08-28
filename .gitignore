@@ -1,5 +1,10 @@
 __pycache__/
 
+# Claude Code / GSD
+.claude/
+.planning/
+code-review-graph/
+
 # Do not commit any directories created during CI.
 /mkl/
 /pypi/
