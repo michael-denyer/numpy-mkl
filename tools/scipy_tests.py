@@ -6,6 +6,16 @@ import sys
 # scipy.test(), causing recursive test runs and a deadlock in test_pool.
 if __name__ == '__main__':
     import scipy
+    from scipy.linalg import blas
+
+    if os.environ.get('RUNNER_OS') == 'Linux':
+        assert blas.HAS_LP64
+        assert blas.HAS_ILP64
+        assert blas.get_blas_funcs('gemm', ilp64=False).int_dtype.name == 'int32'
+        assert blas.get_blas_funcs('gemm', ilp64=True).int_dtype.name == 'int64'
+    else:
+        assert blas.HAS_LP64
+        assert not blas.HAS_ILP64
 
     # Exclude tests with known MKL-specific numerical precision failures.
     # Use -k (name-based filter) rather than --deselect (path-based): passing

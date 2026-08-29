@@ -123,7 +123,8 @@ jobs:
           # Prevent using future MKL versions, which may not be backward compatible.
           RELEASE_YEAR=$(git -C "${{ env.SRC_DIR }}" log -1 --format=%cd --date=format:%Y)
           MKL_SPEC="mkl-devel<$((RELEASE_YEAR + 1)).0.0"
-          if [[ "${{ runner.os }}" == "Linux" && "${{ inputs.name }}" == "numpy" ]]; then
+          if [[ "${{ runner.os }}" == "Linux" &&
+                "${{ inputs.name }}" =~ ^(numpy|scipy)$ ]]; then
             # MKL 2025.2 through 2025.3 omit LAPACK _64_ symbols from the
             # direct ILP64 interface libraries.
             MKL_SPEC="mkl-devel>=2026.0.0,<$((RELEASE_YEAR + 1)).0.0"
@@ -285,12 +286,23 @@ jobs:
               ;;
 
             scipy)
-              # MSVC is unable to compile Pythran, use gcc or set -Duse-pythran=false.
-              # Scipy defaults to the g77-abi if it detects mkl, adding it here explicitly
-              # as redundent fallback. If there's issues, check upstream for new recommendation.
-              args="-Csetup-args=-Dblas=mkl-sdl \
-                    -Csetup-args=-Dlapack=mkl-sdl \
-                    -Csetup-args=-Duse-g77-abi=true"
+              if [[ "${{ runner.os }}" == "Windows" ]]; then
+                # MSVC cannot compile Pythran, so the runner supplies MinGW gcc
+                # and gfortran. Windows stays LP64.
+                args="-Csetup-args=-Dblas=mkl-sdl \
+                      -Csetup-args=-Dlapack=mkl-sdl \
+                      -Csetup-args=-Duse-g77-abi=true"
+              else
+                # SciPy 1.18 still exposes scipy.odr and therefore keeps its
+                # public Cython BLAS/LAPACK ABI at LP64. MKL's LP64 library also
+                # exports suffixed ILP64 symbols, so internal code can use ILP64
+                # while both interfaces come from one shared library.
+                args="-Csetup-args=-Dblas=mkl-dynamic-lp64-seq \
+                      -Csetup-args=-Dlapack=mkl-dynamic-lp64-seq \
+                      -Csetup-args=-Duse-ilp64=true \
+                      -Csetup-args=-Dcython-blas-abi=lp64 \
+                      -Csetup-args=-Duse-g77-abi=true"
+              fi
               ;;
 
             'mkl-service')
@@ -380,9 +392,10 @@ jobs:
           uv pip install wheelhouse/*.whl --index https://michael-denyer.github.io/numpy-mkl
 
           # A feature branch cannot publish its patched mkl-service before this
-          # job tests numpy. Use the hook from the same checkout so the wheel is
-          # exercised without a loader path that end users would not have.
-          if [[ "${{ runner.os }}" == "Linux" && "${{ inputs.name }}" == "numpy" ]]; then
+          # job tests numpy or scipy. Use the hook from the same checkout so the
+          # wheel is exercised without a loader path that end users would not have.
+          if [[ "${{ runner.os }}" == "Linux" &&
+                "${{ inputs.name }}" =~ ^(numpy|scipy)$ ]]; then
             helper=$(python tools/get_file_in_pkg _init_helper.py --pkg mkl-service)
             cp "${GITHUB_WORKSPACE}"/patches/mkl-service/_init_helper.py "$helper"
           fi

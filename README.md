@@ -66,15 +66,16 @@ uv add numpy --index https://michael-denyer.github.io/numpy-mkl
 -Csetup-args=--vsenv
 ```
 
-Only NumPy builds ILP64, and only on Linux. SciPy and mkl-service, on both platforms, and
-NumPy on Windows, stay LP64. Mixing ILP64 NumPy with LP64 SciPy in the same environment is
-untested; treat the two as separate deployment targets until proven otherwise.
+NumPy and SciPy use ILP64 internally only on Linux. SciPy 1.18 keeps its public Cython BLAS and
+LAPACK ABI at LP64 for `scipy.odr`, so its Linux build uses both symbol sets from the same MKL
+library. NumPy and SciPy on Windows stay LP64.
 
 ## Compatibility Notes
 
 - `numpy` wheels are compiled against a lower architecture bound of `X86_V3` (ca. 2013+ for
   Core and Xeon CPUs, ca. 2022+ for Atom CPUs). Older architectures are not supported.
-- **ILP64 wheels are NOT compatible with LP64 wheels** - don't mix them.
+- The Linux NumPy and SciPy wheels are a matched ILP64 set. Do not mix them with LP64 NumPy or
+  SciPy wheels from another index.
 - Performance is similar to LP64 for most operations.
 - Wheels do not vendor MKL on either platform. They depend on the `mkl` runtime package, which
   ships the ILP64 interface library and the compute kernels MKL loads at runtime, and on the

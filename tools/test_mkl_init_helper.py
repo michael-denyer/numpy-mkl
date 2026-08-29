@@ -30,6 +30,7 @@ class TestLinuxPreload(unittest.TestCase):
             PackageFile('libmkl_intel_ilp64.so.3'),
             PackageFile('libmkl_intel_lp64.so.3'),
             PackageFile('libmkl_intel_thread.so.3'),
+            PackageFile('libmkl_sequential.so.3'),
             PackageFile('libmkl_rt.so.3'),
             PackageFile('libmkl_core.so.3'),
         ]
@@ -41,6 +42,8 @@ class TestLinuxPreload(unittest.TestCase):
             'libmkl_rt.so.3',
             'libmkl_core.so.3',
             'libmkl_intel_thread.so.3',
+            'libmkl_sequential.so.3',
+            'libmkl_intel_lp64.so.3',
             'libmkl_intel_ilp64.so.3',
         )
         self.assertEqual(
@@ -50,7 +53,7 @@ class TestLinuxPreload(unittest.TestCase):
                 for name in expected_names
             ],
         )
-        self.assertEqual(namespace['_preloaded_libraries'], [cdll.return_value] * 4)
+        self.assertEqual(namespace['_preloaded_libraries'], [cdll.return_value] * 6)
 
 
 if __name__ == '__main__':

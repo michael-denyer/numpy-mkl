@@ -31,6 +31,8 @@ with contextlib.suppress(
             '*libmkl_rt.so*',
             '*libmkl_core.so*',
             '*libmkl_intel_thread.so*',
+            '*libmkl_sequential.so*',
+            '*libmkl_intel_lp64.so*',
             '*libmkl_intel_ilp64.so*',
         )
         _preloaded_libraries = [
