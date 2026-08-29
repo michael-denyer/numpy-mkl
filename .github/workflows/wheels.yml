@@ -122,10 +122,16 @@ jobs:
         run: |
           # Prevent using future MKL versions, which may not be backward compatible.
           RELEASE_YEAR=$(git -C "${{ env.SRC_DIR }}" log -1 --format=%cd --date=format:%Y)
+          MKL_SPEC="mkl-devel<$((RELEASE_YEAR + 1)).0.0"
+          if [[ "${{ runner.os }}" == "Linux" && "${{ inputs.name }}" == "numpy" ]]; then
+            # MKL 2025.2 through 2025.3 omit LAPACK _64_ symbols from the
+            # direct ILP64 interface libraries.
+            MKL_SPEC="mkl-devel>=2026.0.0,<$((RELEASE_YEAR + 1)).0.0"
+          fi
 
           uv venv "${{ env.MKL_VENV }}"
           source "${{ env.MKL_VENV }}/${{ env.venv_bin }}"/activate
-          uv pip install "mkl-devel<$((RELEASE_YEAR + 1)).0.0"
+          uv pip install "$MKL_SPEC"
 
 
           # Get exact MKL version.
