@@ -21,7 +21,22 @@ with contextlib.suppress(
         dll = next(p for p in files('mkl') if p.match('*mkl_rt*.dll'))
         os.add_dll_directory(dll.locate().resolve().parent)
     else:
-        # There's no easy way to expand LD_LIBRARY_PATH at runtime on Linux.
-        # Instead preload the MKL library directly.
-        lib = next(p for p in files('mkl') if p.match('*libmkl_rt.so*'))
-        ctypes.CDLL(lib.locate().resolve(), mode=ctypes.RTLD_GLOBAL)
+        # The direct MKL libraries refer to symbols in each other without ELF
+        # dependency edges, so the loader must see the group in this order with
+        # lazy binding. Load libmkl_rt first so its LP64 and ILP64 entry points
+        # take precedence over the direct ILP64 interface.
+        mkl_files = tuple(files('mkl'))
+        mode = os.RTLD_LAZY | ctypes.RTLD_GLOBAL
+        patterns = (
+            '*libmkl_rt.so*',
+            '*libmkl_core.so*',
+            '*libmkl_intel_thread.so*',
+            '*libmkl_intel_ilp64.so*',
+        )
+        _preloaded_libraries = [
+            ctypes.CDLL(
+                next(p for p in mkl_files if p.match(pattern)).locate().resolve(),
+                mode=mode,
+            )
+            for pattern in patterns
+        ]

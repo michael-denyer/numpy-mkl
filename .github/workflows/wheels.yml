@@ -169,6 +169,7 @@ jobs:
             grep -q '^from \. import _init_helper$' mkl/__init__.py ||
                 { echo "::error::mkl-service no longer imports _init_helper"; exit 1; }
             cp "${GITHUB_WORKSPACE}"/patches/mkl-service/_init_helper.py mkl/
+            python "${GITHUB_WORKSPACE}"/tools/test_mkl_init_helper.py
           fi
 
           # mkl-devel only ships mkl-sdl.pc (Single Dynamic Library config).
@@ -373,12 +374,12 @@ jobs:
           uv venv testenv && source testenv/"${{ env.venv_bin }}"/activate
           uv pip install wheelhouse/*.whl --index https://michael-denyer.github.io/numpy-mkl
 
-          # The Linux ILP64 numpy links libmkl_intel_ilp64.so.3 directly, but
-          # mkl-service's import hook only preloads libmkl_rt, so the loader
-          # cannot resolve it. This makes the test run work; it does NOT make an
-          # installed wheel self-sufficient. See "Linux ILP64 runtime" in README.
+          # A feature branch cannot publish its patched mkl-service before this
+          # job tests numpy. Use the hook from the same checkout so the wheel is
+          # exercised without a loader path that end users would not have.
           if [[ "${{ runner.os }}" == "Linux" && "${{ inputs.name }}" == "numpy" ]]; then
-            export LD_LIBRARY_PATH="${PWD}/testenv/lib:${LD_LIBRARY_PATH:-}"
+            helper=$(python tools/get_file_in_pkg _init_helper.py --pkg mkl-service)
+            cp "${GITHUB_WORKSPACE}"/patches/mkl-service/_init_helper.py "$helper"
           fi
 
           case "${{ inputs.name }}" in
