@@ -40,10 +40,10 @@ uv add numpy --index https://michael-denyer.github.io/numpy-mkl
 
 ## Platform Support
 
-| Platform | Runner         | BLAS Config            | Wheel Repair |
-|----------|----------------|-------------------------|--------------|
-| Linux    | manylinux_2_28 | mkl-dynamic-ilp64-iomp | auditwheel   |
-| Windows  | windows-2022   | mkl-sdl                | delvewheel   |
+| Platform | NumPy BLAS Config        | SciPy BLAS Config       | Wheel Repair |
+|----------|--------------------------|--------------------------|--------------|
+| Linux    | mkl-dynamic-ilp64-iomp  | mkl-dynamic-lp64-seq    | auditwheel   |
+| Windows  | mkl-dynamic-ilp64-seq   | mkl-sdl                 | delvewheel   |
 
 ## Build Changes from Upstream
 
@@ -58,17 +58,20 @@ uv add numpy --index https://michael-denyer.github.io/numpy-mkl
 + -Csetup-args=-Dblas-symbol-suffix=_64
 ```
 
-**Windows** - uses mkl-sdl (same as upstream, LP64):
+**Windows NumPy** - uses MKL's sequential ILP64 interface:
 
-```text
--Csetup-args=-Dblas=mkl-sdl
--Csetup-args=-Dlapack=mkl-sdl
--Csetup-args=--vsenv
+```diff
+- -Csetup-args=-Dblas=mkl-sdl
+- -Csetup-args=-Dlapack=mkl-sdl
++ -Csetup-args=-Dblas=mkl-dynamic-ilp64-seq
++ -Csetup-args=-Dlapack=mkl-dynamic-ilp64-seq
++ -Csetup-args=-Duse-ilp64=true
++ -Csetup-args=-Dblas-symbol-suffix=_64
 ```
 
-NumPy and SciPy use ILP64 internally only on Linux. SciPy 1.18 keeps its public Cython BLAS and
-LAPACK ABI at LP64 for `scipy.odr`, so its Linux build uses both symbol sets from the same MKL
-library. NumPy and SciPy on Windows stay LP64.
+NumPy uses ILP64 on both platforms. SciPy 1.18 uses ILP64 internally on Linux but keeps its public
+Cython BLAS and LAPACK ABI at LP64 for `scipy.odr`, so that build uses both symbol sets from the
+same MKL installation. SciPy stays LP64 on Windows.
 
 ## Compatibility Notes
 
@@ -76,6 +79,8 @@ library. NumPy and SciPy on Windows stay LP64.
   Core and Xeon CPUs, ca. 2022+ for Atom CPUs). Older architectures are not supported.
 - The Linux NumPy and SciPy wheels are a matched ILP64 set. Do not mix them with LP64 NumPy or
   SciPy wheels from another index.
+- On Windows, NumPy is ILP64 and SciPy is LP64. Both are tested together against the same MKL
+  runtime package.
 - Performance is similar to LP64 for most operations.
 - Wheels do not vendor MKL on either platform. They depend on the `mkl` runtime package, which
   ships the ILP64 interface library and the compute kernels MKL loads at runtime, and on the
