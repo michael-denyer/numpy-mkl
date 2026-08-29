@@ -373,6 +373,14 @@ jobs:
           uv venv testenv && source testenv/"${{ env.venv_bin }}"/activate
           uv pip install wheelhouse/*.whl --index https://michael-denyer.github.io/numpy-mkl
 
+          # The Linux ILP64 numpy links libmkl_intel_ilp64.so.3 directly, but
+          # mkl-service's import hook only preloads libmkl_rt, so the loader
+          # cannot resolve it. This makes the test run work; it does NOT make an
+          # installed wheel self-sufficient. See "Linux ILP64 runtime" in README.
+          if [[ "${{ runner.os }}" == "Linux" && "${{ inputs.name }}" == "numpy" ]]; then
+            export LD_LIBRARY_PATH="${PWD}/testenv/lib:${LD_LIBRARY_PATH:-}"
+          fi
+
           case "${{ inputs.name }}" in
             numpy)
               uv pip install -r "${{ env.SRC_DIR }}"/requirements/test_requirements.txt

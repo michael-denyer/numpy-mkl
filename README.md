@@ -80,6 +80,21 @@ untested; treat the two as separate deployment targets until proven otherwise.
   ships the ILP64 interface library and the compute kernels MKL loads at runtime, and on the
   patched `mkl-service` from this index, which locates and preloads them on import.
 
+### Linux ILP64 runtime (known limitation)
+
+The Linux numpy wheel links `libmkl_intel_ilp64.so.3`, `libmkl_intel_thread.so.3` and
+`libmkl_core.so.3` directly. `mkl-service`'s import hook preloads only `libmkl_rt.so`, which
+satisfies an LP64 build but not this one, so the dynamic loader cannot find those libraries on
+its own. Until the hook preloads the interface libraries too, set:
+
+```sh
+export LD_LIBRARY_PATH="$(python -c 'import sys; print(sys.prefix)')/lib:${LD_LIBRARY_PATH}"
+```
+
+Vendoring them into the wheel is not a fix: `auditwheel` copies only link-time libraries, while
+MKL `dlopen`s its compute kernels (`libmkl_def`, `libmkl_avx2`, `libmkl_avx512`) from beside
+whichever `libmkl_core` it loaded, so a vendored wheel fails with `Cannot load libmkl_def.so.3`.
+
 ## Original README
 
 See [urob/numpy-mkl](https://github.com/urob/numpy-mkl) for full documentation on:
