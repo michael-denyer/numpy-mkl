@@ -60,7 +60,6 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.meta.outputs.matrix) }}
       fail-fast: false
-    continue-on-error: true # Release all successful builds, even if some platforms fail.
     defaults:
       run:
         shell: bash
