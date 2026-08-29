@@ -55,7 +55,7 @@ assert runner_os, "RUNNER_OS must be set; refusing to guess the expected integer
 
 # Platforms this repo builds ILP64. Keep in step with the meson args in
 # .github/workflows/wheels.yml.
-ILP64_PLATFORMS = {'Linux'}
+ILP64_PLATFORMS = {'Linux', 'Windows'}
 expect_ilp64 = runner_os in ILP64_PLATFORMS
 
 assert 'mkl' in blas_name.lower(), f"BLAS must be MKL, got: {blas_name}"

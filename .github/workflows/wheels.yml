@@ -121,8 +121,8 @@ jobs:
           # Prevent using future MKL versions, which may not be backward compatible.
           RELEASE_YEAR=$(git -C "${{ env.SRC_DIR }}" log -1 --format=%cd --date=format:%Y)
           MKL_SPEC="mkl-devel<$((RELEASE_YEAR + 1)).0.0"
-          if [[ "${{ runner.os }}" == "Linux" &&
-                "${{ inputs.name }}" =~ ^(numpy|scipy)$ ]]; then
+          if [[ "${{ inputs.name }}" == "numpy" ]] ||
+              [[ "${{ runner.os }}" == "Linux" && "${{ inputs.name }}" == "scipy" ]]; then
             # MKL 2025.2 through 2025.3 omit LAPACK _64_ symbols from the
             # direct ILP64 interface libraries.
             MKL_SPEC="mkl-devel>=2026.0.0,<$((RELEASE_YEAR + 1)).0.0"
@@ -265,9 +265,14 @@ jobs:
                     -Csetup-args=-Dcpu-baseline=X86_V3 \
                     -Csetup-args=-Dcpu-dispatch=max"
               if [[ "${{ runner.os }}" == "Windows" ]]; then
+                # Windows uses the sequential ILP64 interface. The explicit
+                # suffix is required because MKL's pkg-config files do not
+                # declare one, even though the libraries export _64_ symbols.
                 args="${args} \
-                      -Csetup-args=-Dblas=mkl-sdl \
-                      -Csetup-args=-Dlapack=mkl-sdl \
+                      -Csetup-args=-Dblas=mkl-dynamic-ilp64-seq \
+                      -Csetup-args=-Dlapack=mkl-dynamic-ilp64-seq \
+                      -Csetup-args=-Duse-ilp64=true \
+                      -Csetup-args=-Dblas-symbol-suffix=_64 \
                       -Csetup-args=--vsenv"
               else
                 # Linux: ILP64 with 64-bit integer interface and Intel OpenMP.
