@@ -24,15 +24,21 @@ if os.environ.get('RUNNER_OS') == 'Windows':
     libs.mkdir(parents=True, exist_ok=True)
 
 import numpy as np
+from numpy.testing import HAS_LAPACK64
 
 np.show_config()
 
 
 # ---------------------------------------------------------------------------
-# Gate: assert MKL is active (Linux: ILP64 by name; Windows: MKL by name,
-# ILP64 correctness verified via numerical tests below).
-# Small-matrix tests can silently pass with LP64 or non-MKL, hiding the real
-# issue until a 50k+ matrix explodes at runtime.
+# Gate: assert the wheel has the integer width this repo meant to build.
+#
+# HAS_LAPACK64 reads numpy.linalg._umath_linalg._ilp64, compiled into the
+# extension at build time, so it reports what was actually linked. The
+# pkg-config name in show_config() does not: mkl-sdl carries no 'ilp64' in its
+# name, and MKL's LP64 libraries export the _64 symbols too, so a name match
+# proves nothing either way. Nor do the numerical tests below: every matrix
+# here is under 1000x1000, far short of the ~46k LP64 ceiling, so they pass
+# identically on both builds.
 # ---------------------------------------------------------------------------
 print("\n=== Asserting ILP64 + MKL configuration ===\n")
 
@@ -40,29 +46,27 @@ config = np.show_config(mode='dicts')
 blas_name = config.get('Build Dependencies', {}).get('blas', {}).get('name', '')
 lapack_name = config.get('Build Dependencies', {}).get('lapack', {}).get('name', '')
 
-print(f"  BLAS:   {blas_name}")
-print(f"  LAPACK: {lapack_name}")
+print(f"  BLAS:        {blas_name}")
+print(f"  LAPACK:      {lapack_name}")
+print(f"  LAPACK ILP64: {HAS_LAPACK64}")
 
 runner_os = os.environ.get('RUNNER_OS', '')
+assert runner_os, "RUNNER_OS must be set; refusing to guess the expected integer width"
 
-if runner_os == 'Windows':
-    # On Windows, NumPy is built with -Dblas=mkl-sdl (Single Dynamic Library).
-    # mkl-sdl does not include 'ilp64' in its pkg-config name — show_config()
-    # reports 'mkl-sdl'. ILP64 correctness is verified via numerical tests below
-    # (reconstruction error < 1e-8 rules out LP64 mismatch). Assert MKL is active.
-    assert 'mkl' in blas_name.lower(), \
-        f"BLAS must be MKL on Windows, got: {blas_name}"
-    assert 'mkl' in lapack_name.lower(), \
-        f"LAPACK must be MKL on Windows, got: {lapack_name}"
-    print("  MKL active: CONFIRMED (ILP64 correctness verified via numerical tests)\n")
-else:
-    # On Linux, NumPy is built with -Dblas=mkl-dynamic-ilp64-iomp which
-    # explicitly includes 'ilp64' in the pkg-config name and show_config() output.
-    assert 'ilp64' in blas_name.lower(), \
-        f"BLAS must be ILP64, got: {blas_name}"
-    assert 'ilp64' in lapack_name.lower(), \
-        f"LAPACK must be ILP64, got: {lapack_name}"
-    print("  ILP64 configuration: CONFIRMED\n")
+# Platforms this repo builds ILP64. Keep in step with the meson args in
+# .github/workflows/wheels.yml.
+ILP64_PLATFORMS = {'Linux'}
+expect_ilp64 = runner_os in ILP64_PLATFORMS
+
+assert 'mkl' in blas_name.lower(), f"BLAS must be MKL, got: {blas_name}"
+assert 'mkl' in lapack_name.lower(), f"LAPACK must be MKL, got: {lapack_name}"
+
+assert HAS_LAPACK64 == expect_ilp64, (
+    f"{runner_os} wheel should be {'ILP64' if expect_ilp64 else 'LP64'}, "
+    f"but numpy reports HAS_LAPACK64={HAS_LAPACK64} (blas={blas_name})"
+)
+
+print(f"  MKL active, {'ILP64' if expect_ilp64 else 'LP64'} as intended: CONFIRMED\n")
 
 
 # ---------------------------------------------------------------------------
