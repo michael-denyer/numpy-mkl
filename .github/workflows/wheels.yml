@@ -99,13 +99,11 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           echo "venv_bin=bin" >>$GITHUB_ENV
-          echo "MKLROOT=${{ env.MKL_DIR }}" >>$GITHUB_ENV
 
       - name: Prepare environment (Windows)
         if: runner.os == 'Windows'
         run: |
           echo "venv_bin=Scripts" >>$GITHUB_ENV
-          echo "MKLROOT=${{ env.MKL_DIR }}/Library" >>$GITHUB_ENV
 
       - name: Set up python
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
@@ -175,7 +173,8 @@ jobs:
             grep -q '^from \. import _init_helper$' mkl/__init__.py ||
                 { echo "::error::mkl-service no longer imports _init_helper"; exit 1; }
             cp "${GITHUB_WORKSPACE}"/patches/mkl-service/_init_helper.py mkl/
-            python "${GITHUB_WORKSPACE}"/tools/test_mkl_init_helper.py
+            uv run --no-project python \
+                "${GITHUB_WORKSPACE}"/tools/test_mkl_init_helper.py
           fi
 
           # mkl-devel only ships mkl-sdl.pc (Single Dynamic Library config).
@@ -339,7 +338,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           uvx delvewheel show "${{ env.SRC_DIR }}"/dist/*.whl \
-              --add-path "${{ env.MKL_DIR }}/Library/bin"
+              --add-path "${{ env.MKL_VENV }}/Library/bin"
 
       - name: Strip symbols (Windows)
         env:
@@ -376,7 +375,7 @@ jobs:
           # both mkl_rt.2.dll (mkl 2025.x) and mkl_rt.3.dll (mkl 2026.x).
           uv run --locked --only-group build-deps \
               delvewheel repair "${{ env.SRC_DIR }}"/dist/*.whl -w wheelhouse \
-              --add-path "${{ env.MKL_DIR }}/Library/bin" \
+              --add-path "${{ env.MKL_VENV }}/Library/bin" \
               --exclude "mkl_rt.*.dll" --exclude libsf_error_state.dll
         if: runner.os == 'windows'
 
