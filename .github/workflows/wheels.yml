@@ -373,15 +373,14 @@ jobs:
           UV_PROJECT_ENVIRONMENT: ${{ env.BUILD_VENV }}
         run: |
           mkdir -p wheelhouse
-          # Exclude mkl_rt.*.dll — MKL runtime DLLs are provided by the mkl pip
-          # package (installed separately in the test step). Bundling mkl_rt
-          # into the wheel causes LoadLibrary failures because its kernel deps
-          # (mkl_intel_thread etc.) aren't bundled alongside it. Glob covers
-          # both mkl_rt.2.dll (mkl 2025.x) and mkl_rt.3.dll (mkl 2026.x).
+          # MKL runtime DLLs are provided by the mkl pip package installed in
+          # the test environment. Exclude all of them: copying only one direct
+          # interface DLL makes delvewheel load it before mkl-service registers
+          # the directory containing the rest of the MKL runtime.
           uv run --locked --only-group build-deps \
               delvewheel repair "${{ env.SRC_DIR }}"/dist/*.whl -w wheelhouse \
               --add-path "${{ env.MKL_VENV }}/Library/bin" \
-              --exclude "mkl_rt.*.dll" --exclude libsf_error_state.dll
+              --exclude "mkl_*.dll" --exclude libsf_error_state.dll
         if: runner.os == 'windows'
 
       - name: Run tests
