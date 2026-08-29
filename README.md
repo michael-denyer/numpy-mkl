@@ -76,8 +76,9 @@ untested; treat the two as separate deployment targets until proven otherwise.
   Core and Xeon CPUs, ca. 2022+ for Atom CPUs). Older architectures are not supported.
 - **ILP64 wheels are NOT compatible with LP64 wheels** - don't mix them.
 - Performance is similar to LP64 for most operations.
-- Linux ILP64 wheels bundle their own MKL runtime libraries, since PyPI's `mkl` package only
-  ships the LP64 runtime. Windows wheels still require the `mkl` pip package for runtime DLLs.
+- Wheels do not vendor MKL on either platform. They depend on the `mkl` runtime package, which
+  ships the ILP64 interface library and the compute kernels MKL loads at runtime, and on the
+  patched `mkl-service` from this index, which locates and preloads them on import.
 
 ## Original README
 

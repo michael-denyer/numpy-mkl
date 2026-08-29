@@ -307,18 +307,14 @@ jobs:
         run: |
           mkdir -p wheelhouse
           plat="$(ldd --version | head -1 | awk '{ print $NF }' | tr '.' '_')_$(uname -m)"
-          if [[ "${{ inputs.name }}" == "numpy" ]]; then
-            # ILP64: PyPI's mkl package only ships the LP64 runtime, so numpy's
-            # ILP64 wheel must bundle its own MKL libs instead of excluding them.
-            export LD_LIBRARY_PATH="${{ env.MKL_DIR }}/lib:${LD_LIBRARY_PATH:-}"
-            uv run --locked --only-group build-deps \
-                auditwheel repair "${{ env.SRC_DIR }}"/dist/*.whl -w wheelhouse \
-                --plat=manylinux_${plat} --strip
-          else
-            uv run --locked --only-group build-deps \
-                auditwheel repair "${{ env.SRC_DIR }}"/dist/*.whl -w wheelhouse \
-                --exclude 'libmkl*' --plat=manylinux_${plat} --strip
-          fi
+          # Never vendor MKL, ILP64 included: the mkl runtime package ships
+          # libmkl_intel_ilp64.so.3 alongside the LP64 one. Vendoring bundles only
+          # the link-time libs, while MKL dlopen()s its compute kernels
+          # (libmkl_def, libmkl_avx2, libmkl_avx512) at runtime and they would be
+          # missing from the wheel.
+          uv run --locked --only-group build-deps \
+              auditwheel repair "${{ env.SRC_DIR }}"/dist/*.whl -w wheelhouse \
+              --exclude 'libmkl*' --plat=manylinux_${plat} --strip
         if: runner.os == 'Linux'
 
       - name: Show wheel dependencies (Windows)
@@ -368,27 +364,14 @@ jobs:
 
       - name: Run tests
         run: |
-          if [[ "${{ runner.os }}" == "Linux" && "${{ inputs.name }}" == "numpy" ]]; then
-            # ILP64: PyPI's mkl package only ships the LP64 runtime. Keep pointing
-            # at the dev-time MKL install so numpy's dispatcher loads the ILP64
-            # kernels it was actually linked against, rather than the bundled or
-            # separately pip-installed LP64 libs.
-            export LD_LIBRARY_PATH="${{ env.MKL_DIR }}/lib:${LD_LIBRARY_PATH:-}"
-          elif [[ "${{ runner.os }}" == "Linux" ]]; then
-            # Make sure we don't pick up the development MKL libraries.
-            rm -rf "${{ env.MKL_VENV }}"
-          fi
+          # Make sure we don't pick up the development MKL libraries.
+          rm -rf "${{ env.MKL_VENV }}"
 
-          # Set up test environment.
+          # Set up test environment. Resolving from our own index pulls the
+          # patched mkl-service, whose import hook locates and preloads the MKL
+          # runtime for numpy and scipy.
           uv venv testenv && source testenv/"${{ env.venv_bin }}"/activate
-          # --no-deps keeps the test environment exact: mkl is pinned below,
-          # and mkl-service would otherwise resolve from PyPI (upstream's
-          # build), not from our index.
-          uv pip install --no-deps wheelhouse/*.whl
-          # Install MKL runtime package — provides mkl_rt.2.dll, mkl_intel_thread.2.dll,
-          # and other kernel DLLs. numpy's _distributor_init.py registers the DLL
-          # directory automatically on import.
-          uv pip install mkl>="${{ env.MKL_VERSION }}"
+          uv pip install wheelhouse/*.whl --index https://michael-denyer.github.io/numpy-mkl
 
           case "${{ inputs.name }}" in
             numpy)
