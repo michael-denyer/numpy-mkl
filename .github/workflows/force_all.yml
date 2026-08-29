@@ -7,12 +7,18 @@ permissions:
   contents: write
 
 jobs:
+  # See force_numpy.yml: the test step resolves against our index, which must
+  # carry the MKL runtime the built wheels pin.
+  links:
+    uses: ./.github/workflows/links.yml
+
   mkl-service:
     uses: ./.github/workflows/wheels.yml
     with:
       name: mkl-service
       repo: IntelPython/mkl-service
       force-build: true
+    needs: links
 
   numpy:
     uses: ./.github/workflows/wheels.yml
@@ -20,7 +26,7 @@ jobs:
       name: numpy
       repo: numpy/numpy
       force-build: true
-    needs: mkl-service
+    needs: [links, mkl-service]
 
   scipy:
     uses: ./.github/workflows/wheels.yml
@@ -28,4 +34,4 @@ jobs:
       name: scipy
       repo: scipy/scipy
       force-build: true
-    needs: [mkl-service, numpy]
+    needs: [links, mkl-service, numpy]

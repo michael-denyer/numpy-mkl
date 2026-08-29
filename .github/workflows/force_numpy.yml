@@ -7,6 +7,12 @@ permissions:
   contents: write
 
 jobs:
+  # Refresh the mirrored PyPI links first. The test step resolves the built
+  # wheel against our own index, which must carry the MKL runtime that wheel
+  # pins, or resolution fails against a stale mirror.
+  links:
+    uses: ./.github/workflows/links.yml
+
   numpy:
     uses: ./.github/workflows/wheels.yml
     with:
@@ -14,3 +20,4 @@ jobs:
       repo: numpy/numpy
       force-build: true
       # version: 2.5.1
+    needs: links
