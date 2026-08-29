@@ -435,7 +435,10 @@ jobs:
   #-----------------------------------------------------------------------------------------------
   release:
     needs: [meta, build]
-    if: ${{ needs.meta.outputs.matrix != 'null' }}
+    # Only publish from main. Releasing commits to main and cuts a GitHub
+    # release, so a dispatch from a feature branch would ship wheels that
+    # branch's build is still being evaluated for.
+    if: ${{ needs.meta.outputs.matrix != 'null' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
