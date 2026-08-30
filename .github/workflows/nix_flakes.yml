@@ -1,0 +1,165 @@
+name: Update nix derivations
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows:
+      - Build wheels
+      - Rebuild all
+    types: [completed]
+
+permissions:
+  contents: write
+
+jobs:
+  nix:
+    if: >-
+      github.repository == 'michael-denyer/numpy-mkl' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Explicitly set ref, as workflow_run checks out the triggering commit.
+          ref: main
+          persist-credentials: true  # Need credentials to push.
+
+      - name: Set up nix
+        uses: cachix/install-nix-action@630ae543ea3a38a9a4166f03376c02c50f408342 # v31.11.0
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Set up python
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version-file: "pyproject.toml"
+
+      - name: Update nixpkgs
+        run: |
+          nix flake update
+
+      - name: Fetch package index
+        run: |
+          # Resolve against the `pypi` branch rather than the pages site it is
+          # served from: the index is pushed during the wheel build, but its
+          # deployment finishes independently and can lag by a minute. Clone
+          # outside the work tree, so the index is never committed to main.
+          git clone --quiet --depth 1 --branch pypi \
+              "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "$RUNNER_TEMP/index"
+
+      - name: Update wheels
+        run: |
+          uv run tools/update-nix-wheels templates/dependency.nix \
+              -d nix -c ci-targets.yaml -f templates/nix/flake.nix \
+              --index "$RUNNER_TEMP/index"
+
+      - name: Check overlay
+        run: |
+          # Stage the changes, as nix ignores untracked files in a git tree.
+          git add -A
+
+          # The template ships without a lock file, so just check that it parses.
+          nix-instantiate --parse templates/nix/flake.nix >/dev/null
+
+          # Every package of the resolution needs an overlay attribute, or it
+          # silently keeps whichever version nixpkgs ships.
+          nix eval --impure --expr '
+            let
+              wheels = import ./nix/wheels.nix;
+              extension = builtins.head (
+                (import ./nix/overlay.nix null {
+                  pythonPackagesExtensions = [ ];
+                }).pythonPackagesExtensions
+              );
+              exposed = builtins.attrNames (extension null null);
+              resolved = builtins.attrNames wheels.${builtins.head (builtins.attrNames wheels)};
+            in
+            if exposed == resolved then
+              true
+            else
+              throw "overlay exposes ${toString exposed}, resolution has ${toString resolved}"
+          ' >/dev/null
+
+      - name: Verify derivations
+        run: |
+          # Store paths are input-addressed, so an unchanged path means every
+          # input -- the nixpkgs revision, each wheel hash, the overlay itself --
+          # is unchanged, and the environments built below would be identical to
+          # the ones the last run already imported. Evaluating the paths is pure
+          # and takes seconds; building them fetches and patches ~1 GB per
+          # interpreter, and nixpkgs bumps routinely leave them untouched.
+          fingerprint=$(nix eval --raw --impure --expr '
+            let
+              flake = builtins.getFlake (toString ./.);
+              pkgs = import flake.inputs.nixpkgs {
+                system = "x86_64-linux";
+                overlays = [ flake.overlays.default ];
+              };
+              inherit (pkgs) lib;
+              attrFor = version: "python" + lib.replaceStrings [ "." ] [ "" ] version;
+              envFor =
+                version:
+                (pkgs.${attrFor version}.withPackages (ps: [
+                  ps.numpy
+                  ps.scipy
+                ])).outPath;
+            in
+            builtins.hashString "sha256" (builtins.concatStringsSep "\n" (
+              map envFor (builtins.attrNames (import ./nix/wheels.nix))
+              ++ [ flake.devShells.x86_64-linux.default.outPath ]
+            ))')
+
+          if [[ "$fingerprint" == "$(cat nix/.verified 2>/dev/null)" ]]; then
+              echo "Derivations unchanged since the last verified run, skipping build."
+              exit 0
+          fi
+
+          # Numpy only warns when mkl-service is missing, so import mkl
+          # directly. Solving an eigenproblem confirms mkl itself is loadable.
+          check='
+          import mkl, numpy, scipy.linalg
+          scipy.linalg.eigh(numpy.eye(4))
+          print(numpy.__version__, scipy.__version__, mkl.get_version_string())
+          '
+
+          # Build and import every python the resolution supports.
+          for version in $(nix eval --raw --impure --expr \
+              'builtins.concatStringsSep " " (builtins.attrNames (import ./nix/wheels.nix))'); do
+              echo "::group::python $version"
+              env=$(nix build --no-link --print-out-paths --impure --expr "
+                let
+                  flake = builtins.getFlake (toString ./.);
+                  pkgs = import flake.inputs.nixpkgs {
+                    system = \"x86_64-linux\";
+                    overlays = [ flake.overlays.default ];
+                  };
+                in
+                pkgs.python${version//./}.withPackages (ps: [ ps.numpy ps.scipy ])")
+              "$env/bin/python" -c "$check"
+              echo "::endgroup::"
+          done
+
+          # The devshell tracks the newest supported python.
+          nix develop -c python -c 'import mkl, numpy, scipy'
+
+          # Record the verified state only once every check above has passed.
+          # The fingerprint covers what is built, not how it is checked, so
+          # delete this file by hand when changing the checks themselves.
+          echo "$fingerprint" > nix/.verified
+
+      - name: Commit nix derivations
+        run: |
+          if [[ -z "$(git status --porcelain)" ]]; then
+              echo "No changes to commit"
+              exit 0
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .
+          git commit -m "ci: Update nix derivations"
+          git push origin HEAD:main

@@ -6,7 +6,7 @@ $VENV_DIR = "$tmp\testenv"
 # numpy-mkl
 uv venv $VENV_DIR
 . "$VENV_DIR\Scripts\activate.ps1"
-uv pip install numpy scipy --index https://urob.github.io/numpy-mkl
+uv pip install numpy scipy --index https://michael-denyer.github.io/numpy-mkl
 python "$PSScriptRoot\benchmarks.py"
 deactivate
 Remove-Item -Path $VENV_DIR -Recurse -Force

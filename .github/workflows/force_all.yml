@@ -1,9 +1,8 @@
-name: Rebuild mkl-service matched set
+name: Rebuild all
 
 on:
   workflow_dispatch:
 
-# Publishing one package is unsafe: this shortcut forces and verifies the matched set.
 jobs:
   verify:
     if: ${{ github.ref != 'refs/heads/main' }}

@@ -6,80 +6,60 @@ on:
       name:
         required: true
         type: string
-        description: "Package to build (numpy, mkl-service)"
+        description: "Package to build (numpy, scipy, mkl-service)"
       repo:
         required: true
         type: string
-        description: "Repo to build (numpy/numpy, IntelPython/mkl-service)"
-      force-build:
-        required: false
-        type: boolean
-        description: "Force build even if wheels exist"
-      manylinux:
-        required: false
-        type: boolean
-        description: "Build Linux wheels in manylinux container"
-      version:
-        required: false
+        description: "Source repo (numpy/numpy, scipy/scipy, IntelPython/mkl-service)"
+      matrix:
+        required: true
         type: string
-        description: "Version to build (default: latest release)"
+        description: "Shared package-set build coordinates"
+      tag:
+        required: true
+        type: string
+        description: "Upstream source tag selected by the package-set plan"
+      version:
+        required: true
+        type: string
+        description: "Upstream version selected by the package-set plan"
+
+env:
+  PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
 
 jobs:
-  meta:
-    if: github.repository == 'michael-denyer/numpy-mkl'
-    runs-on: ubuntu-latest
-    outputs:
-      tag: ${{ env.tag }}
-      version: ${{ env.version }}
-      matrix: ${{ env.matrix }}
-    steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          persist-credentials: false
-
-      - name: Set up python
-        uses: astral-sh/setup-uv@681c641aba71e4a1c380be3ab5e12ad51f415867 # v7.1.6
-        with:
-          version-file: "pyproject.toml"
-
-      - name: Fetch build matrix
-        run: |
-          uv run tools/fetch_matrix2 ${{ inputs.name }} --config ci-targets.yaml \
-            --store build.json --token ${{ secrets.GITHUB_TOKEN }} \
-            ${{ inputs.force-build && '--force-build' || '' }} >matrix.json
-
-          echo "tag=$(jq -rc '."tag"' matrix.json)" >>$GITHUB_ENV
-          echo "version=$(jq -rc '."version"' matrix.json)" >>$GITHUB_ENV
-          echo "matrix=$(jq -c '."matrix"' matrix.json)" >>$GITHUB_ENV
-
-          cat matrix.json | yq -P -o yaml
-
-  #-----------------------------------------------------------------------------------------------
   build:
     name: ${{ inputs.name }}-${{ matrix.python_version }} (${{ matrix.runner }})
-    needs: meta
-    if: ${{ needs.meta.outputs.matrix != 'null' }}
     runs-on: ${{ matrix.runner }}
     container: ${{ matrix.container }}
+    env:
+      PACKAGE_NAME: ${{ inputs.name }}
+      PACKAGE_VERSION: ${{ inputs.version }}
+      PYTHON_TAG: ${{ matrix.python_version }}
+      NUMPY_BLAS: ${{ matrix.numpy_blas }}
+      NUMPY_ILP64: ${{ matrix.numpy_ilp64 }}
+      NUMPY_SYMBOL_SUFFIX: ${{ matrix.numpy_symbol_suffix }}
+      SCIPY_BLAS: ${{ matrix.scipy_blas }}
+      SCIPY_ILP64: ${{ matrix.scipy_ilp64 }}
+      SCIPY_CYTHON_BLAS_ABI: ${{ matrix.scipy_cython_blas_abi }}
     strategy:
-      matrix: ${{ fromJson(needs.meta.outputs.matrix) }}
+      matrix: ${{ fromJson(inputs.matrix) }}
       fail-fast: false
-    # Don't use continue-on-error: broken wheels would get released.
     defaults:
       run:
         shell: bash
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Check out src
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ inputs.repo }}
-          ref: ${{ needs.meta.outputs.tag }}
+          ref: ${{ inputs.tag }}
           path: src
           submodules: recursive
           persist-credentials: false
@@ -92,70 +72,93 @@ jobs:
           # Move src to avoid pyproject conflicts.
           mv src ../../ && echo "SRC_DIR=${GITHUB_WORKSPACE}/../../src" >>$GITHUB_ENV
 
-          # Keep MKL directory short as it ends up in the final build.
-          echo "MKL_DIR=$(realpath "${GITHUB_WORKSPACE}"/../../mkl)" >>$GITHUB_ENV
+          # Path to MKL sources, referenced in the final build.
+          echo "MKL_VENV=$(realpath "${GITHUB_WORKSPACE}"/../../mkl)" >>$GITHUB_ENV
+
+          # Dedicated environment for the 'build-deps' group. Kept out of the workspace and
+          # passed as UV_PROJECT_ENVIRONMENT only to the steps that use the group, so that
+          # syncing it can never clobber (or be clobbered by) another venv.
+          echo "BUILD_VENV=$(realpath "${GITHUB_WORKSPACE}"/../../build-deps)" >>$GITHUB_ENV
 
       - name: Prepare environment (Linux)
         if: runner.os != 'Windows'
         run: |
           echo "venv_bin=bin" >>$GITHUB_ENV
-          echo "MKLROOT=${{ env.MKL_DIR }}" >>$GITHUB_ENV
 
       - name: Prepare environment (Windows)
         if: runner.os == 'Windows'
         run: |
           echo "venv_bin=Scripts" >>$GITHUB_ENV
-          echo "MKLROOT=${{ env.MKL_DIR }}/Library" >>$GITHUB_ENV
 
       - name: Set up python
-        uses: astral-sh/setup-uv@681c641aba71e4a1c380be3ab5e12ad51f415867 # v7.1.6
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
           python-version: ${{ matrix.python_version }}
           version-file: "pyproject.toml"
           enable-cache: false
 
-      - name: Install build dependencies (Windows)
-        if: runner.os == 'Windows'
-        run: choco install -y --no-progress --stoponfirstfailure --checksum 6004DF17818F5A6DBF19CB335CC92702 pkgconfiglite
-
       - name: Install MKL libraries
         run: |
-          # Pin mkl-devel to the same major year as the upstream release being
-          # built. Prevents picking up future MKL majors with breaking layout
-          # changes (e.g. mkl 2026.0 bumped libmkl_rt.so.2 -> libmkl_rt.so.3).
+          # Prevent using future MKL versions, which may not be backward compatible.
           RELEASE_YEAR=$(git -C "${{ env.SRC_DIR }}" log -1 --format=%cd --date=format:%Y)
+          MKL_SPEC="mkl-devel<$((RELEASE_YEAR + 1)).0.0"
+          if [[ "$PACKAGE_NAME" == "numpy" && "$NUMPY_ILP64" == "true" ]] ||
+              [[ "$PACKAGE_NAME" == "scipy" && "$SCIPY_ILP64" == "true" ]]; then
+            # MKL 2025.2 through 2025.3 omit LAPACK _64_ symbols from the
+            # direct ILP64 interface libraries.
+            MKL_SPEC="mkl-devel>=2026.0.0,<$((RELEASE_YEAR + 1)).0.0"
+          fi
 
-          uv venv "${{ env.MKL_DIR }}"
-          source "${{ env.MKL_DIR }}/${{ env.venv_bin }}"/activate
-          uv pip install "mkl-devel<$((RELEASE_YEAR + 1)).0.0"
+          uv venv "${{ env.MKL_VENV }}"
+          source "${{ env.MKL_VENV }}/${{ env.venv_bin }}"/activate
+          uv pip install "$MKL_SPEC"
+
 
           # Get exact MKL version.
           echo "MKL_VERSION=$(uv pip show mkl | grep '^Version' | sed 's/Version: //')" \
               >>$GITHUB_ENV
 
-          # Get pkg-config path.
+          # Get pkg-config path (numpy, scipy).
           echo "PKG_CONFIG_PATH=$(python tools/get_file_in_pkg mkl-sdl.pc \
+              --pkg mkl-devel --parent)" >>$GITHUB_ENV
+
+          # Get CMake package path (mkl-service). MKL_DIR is where CMake's find_package looks
+          # for MKLConfig.cmake.
+          echo "MKL_DIR=$(python tools/get_file_in_pkg MKLConfig.cmake \
               --pkg mkl-devel --parent)" >>$GITHUB_ENV
 
           # Fetch MKL license.
           cat "$(python tools/get_file_in_pkg LICENSE.txt --pkg mkl-devel)" \
               >>"${GITHUB_WORKSPACE}/patches/LICENSE_MKL.txt"
 
-      - name: Add .so -> .so.* symlinks (Linux only)
-        if: runner.os == 'Linux'
-        run: |
-          # The linker resolves -lmkl_rt by looking for libmkl_rt.so. mkl wheels
+          # Add .so -> .so.* symlinks to fix linking for mkl-service. mkl wheels
           # ship only versioned filenames (libmkl_rt.so.2 in 2025.x, .so.3 in
-          # 2026.x), so create unversioned symlinks for whatever the wheel
-          # actually shipped.
-          cd "${{ env.MKL_DIR }}"/lib
-          for i in libmkl*.so.*; do ln -s $i ${i%.*}; done
+          # 2026.x); the linker resolves -lmkl_rt by looking for libmkl_rt.so.
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            cd "${{ env.MKL_VENV }}"/lib
+            for i in libmkl*.so.*; do ln -s $i ${i%.*}; done
+          fi
 
       - name: Apply patches
         run: |
-          # Apply patches.
+          # Apply patches, if the package has any.
           cd "${{ env.SRC_DIR }}"
-          git apply "${GITHUB_WORKSPACE}"/patches/${{ inputs.name }}/*.patch
+          mapfile -t patches < <(
+            find "${GITHUB_WORKSPACE}/patches/$PACKAGE_NAME" -maxdepth 1 \
+              -name '*.patch' -print
+          )
+          [[ ${#patches[@]} -eq 0 ]] || git apply "${patches[@]}"
+
+          # Swap in our own import-time hook, which locates MKL through the installed
+          # 'mkl' package instead of assuming a Windows venv layout. This relies on
+          # _init_helper getting imported, so we assert first that it is.
+          if [[ "$PACKAGE_NAME" == "mkl-service" ]]; then
+            grep -q '^from \. import _init_helper$' mkl/__init__.py ||
+                { echo "::error::mkl-service no longer imports _init_helper"; exit 1; }
+            cp "${GITHUB_WORKSPACE}"/patches/mkl-service/_init_helper.py mkl/
+            uv run --no-project python \
+                "${GITHUB_WORKSPACE}"/tools/test_mkl_init_helper.py
+          fi
 
           # mkl-devel only ships mkl-sdl.pc (Single Dynamic Library config).
           # meson.build requires plain "mkl" for version checking.
@@ -166,14 +169,14 @@ jobs:
         working-directory: ${{ env.SRC_DIR }}
         run: |
           # Pin runtime library to the exact version used for compiling.
-          # --frozen skips resolution: resolving would build the project (its
-          # version is dynamic) before the build environment is set up.
-          if [[ "${{ inputs.name }}" == "mkl-service" ]]; then
-            uv add --frozen "mkl>=${{ env.MKL_VERSION }}"
+          MAJOR=$(echo "$MKL_VERSION" | cut -d. -f1)
+          if [[ "$PACKAGE_NAME" == "mkl-service" ]]; then
+            # Use --frozen (implies --no-sync) to skip re-locking, which would make meson-python
+            # configure the whole project just to resolve the dynamic version.
+            uv add --frozen "mkl>=${MKL_VERSION},<$((MAJOR + 1)).0.0"
           else
-            # mkl-service floor: 2.8.0 is the first version with Windows
-            # wheels on our index.
-            uv add --frozen "mkl>=${{ env.MKL_VERSION }}" "mkl-service>=2.8.0"
+            # mkl-service floor: 2.8.0 is the first version with Windows wheels on our index.
+            uv add --no-sync "mkl>=${MKL_VERSION},<$((MAJOR + 1)).0.0" "mkl-service>=2.8.0"
           fi
 
       - name: Add MKL licence
@@ -182,134 +185,211 @@ jobs:
           echo "" >>LICENSE.txt
           echo "----" >>LICENSE.txt
           echo "" >>LICENSE.txt
+          [[ "$PACKAGE_NAME" == "scipy" ]] && cat LICENSES_bundled.txt >>LICENSE.txt
           cat "${GITHUB_WORKSPACE}/patches/LICENSE_MKL.txt" >>LICENSE.txt
         if: inputs.name != 'mkl-service'
 
+      - name: Install Windows build dependencies
+        env:
+          UV_PROJECT_ENVIRONMENT: ${{ env.BUILD_VENV }}
+        run: |
+          if [[ "$PACKAGE_NAME" == "numpy" || "$PACKAGE_NAME" == "scipy" ]]; then
+            # Pkg-config is required for numpy and scipy. Use the locked PyPI package;
+            # Chocolatey's SourceForge download intermittently times out.
+            echo "PKG_CONFIG=$(uv run --locked --only-group build-deps \
+                python -c 'import pkgconf; print(pkgconf.get_executable())')" >>$GITHUB_ENV
+          fi
+          if [[ "$PACKAGE_NAME" == "scipy" ]]; then
+            # SciPy requires the MinGW gcc/gfortran and binutils already on the runner.
+            gfortran --version || { echo "::error::no gfortran on PATH"; exit 1; }
+            strip --version >/dev/null || { echo "::error::no strip on PATH"; exit 1; }
+          fi
+        if: runner.os == 'Windows'
+
       - name: Install manylinux build dependencies
         run: |
-          case "${{ inputs.name }}" in
+          case "$PACKAGE_NAME" in
             mkl-service)
               dnf -y install clang
-              ;&
+              ;;
             numpy)
               # Tests for distutil require clang (Python < 3.12).
               [[ "$UV_PYTHON" =~ ^(cp310|cp311)$ ]] && dnf -y install clang || true
-              ;&
+              ;;
           esac
-        if: inputs.manylinux && runner.os == 'Linux'
+        if: runner.os == 'Linux'
 
       - name: Build wheel
         working-directory: ${{ env.SRC_DIR }}
         run: |
-          case "${{ inputs.name }}" in
+          case "$PACKAGE_NAME" in
             numpy)
-              # Shared args (all platforms)
-              args="--index https://michael-denyer.github.io/numpy-mkl \
-                    -Csetup-args=-Dallow-noblas=false \
-                    -Csetup-args=-Dcpu-baseline=F16C \
-                    -Csetup-args=-Dcpu-dispatch=AVX512_ICL"
-
+              # Baseline is the floor the whole library is compiled against, so the wheel refuses
+              # to import below it: X86_V3 is x86-64-v3 (AVX2/FMA3/BMI2), i.e. Intel Haswell
+              # 2013+. It only buys speed in code numpy cannot runtime-dispatch (~10-18% on
+              # np.where, casts, structured assignment). 'max' takes every dispatch level the
+              # compiler supports at the cost of some binary size. Note MSVC gets none of them:
+              # numpy disables X86_V4 and AVX512_ICL there (broken in Highway), so the Windows
+              # wheels are AVX2-only regardless of what we ask for.
+              args="-Csetup-args=-Dallow-noblas=false \
+                    -Csetup-args=-Dcpu-baseline=X86_V3 \
+                    -Csetup-args=-Dcpu-dispatch=max \
+                    -Csetup-args=-Dblas=${NUMPY_BLAS} \
+                    -Csetup-args=-Dlapack=${NUMPY_BLAS} \
+                    -Csetup-args=-Duse-ilp64=${NUMPY_ILP64} \
+                    -Csetup-args=-Dblas-symbol-suffix=${NUMPY_SYMBOL_SUFFIX}"
               if [[ "${{ runner.os }}" == "Windows" ]]; then
-                # BLD-01: --vsenv activates MSVC developer environment via vcvarsall.bat
-                # BLD-02+04: mkl-sdl is the only MKL .pc file shipped by mkl-devel on Windows
-                args="${args} \
-                      -Csetup-args=-Dblas=mkl-sdl \
-                      -Csetup-args=-Dlapack=mkl-sdl \
-                      -Csetup-args=--vsenv"
-              else
-                # Linux: ILP64 with 64-bit integer interface and Intel OpenMP
-                # BLD-03: -Duse-ilp64=true and -Dblas-symbol-suffix=_64 force ILP64
-                # symbol resolution. These flags are Linux-only — on Windows with
-                # mkl-sdl, ILP64 activation is handled differently and verified
-                # in Phase 3 via numpy_tests.py (per updated BLD-03 requirement).
-                # -Dblas-symbol-suffix=_64 forces _64-suffixed symbols (dsyevd_64_ not dsyevd_)
-                # so the linker can ONLY resolve to ILP64 libraries. Without this, auditwheel-
-                # bundled wheels may resolve unsuffixed symbols to LP64 and return garbage.
-                # See scipy/meson.build:386-390 for similar approach.
-                args="${args} \
-                      -Csetup-args=-Dblas=mkl-dynamic-ilp64-iomp \
-                      -Csetup-args=-Dlapack=mkl-dynamic-ilp64-iomp \
-                      -Csetup-args=-Duse-ilp64=true \
-                      -Csetup-args=-Dblas-symbol-suffix=_64"
+                args="${args} -Csetup-args=--vsenv"
+              fi
+              ;;
+
+            scipy)
+              args="-Csetup-args=-Dblas=${SCIPY_BLAS} \
+                    -Csetup-args=-Dlapack=${SCIPY_BLAS} \
+                    -Csetup-args=-Duse-g77-abi=true"
+              if [[ "$SCIPY_ILP64" == "true" ]]; then
+                # SciPy keeps its public Cython ABI at LP64 while using ILP64 internally.
+                args="${args} -Csetup-args=-Duse-ilp64=true \
+                      -Csetup-args=-Dcython-blas-abi=${SCIPY_CYTHON_BLAS_ABI}"
               fi
               ;;
 
             'mkl-service')
-              # mkl-service >=2.8.0 builds with meson-python and discovers MKL
-              # via cmake: dependency('MKL', method: 'cmake'). CMAKE_PREFIX_PATH
-              # locates MKLConfig.cmake in the pinned MKL install; MKLROOT (set
-              # per-OS in Prepare environment) guides its internal lib search.
-              export CMAKE_PREFIX_PATH="${MKLROOT}"
-              export CFLAGS="${CFLAGS} -fno-fast-math"
-              # build-system.requires pulls mkl-devel unpinned into the
-              # isolated build env; constrain it to the compile-time version.
-              echo "mkl-devel==${{ env.MKL_VERSION }}" >"${GITHUB_WORKSPACE}/build-constraints.txt"
-              args="--build-constraints=${GITHUB_WORKSPACE}/build-constraints.txt"
-              if [[ "${{ runner.os }}" == "Windows" ]]; then
-                # --vsenv activates the MSVC developer environment (see BLD-01).
-                args="${args} -Csetup-args=--vsenv"
-              fi
+              # Built with meson-python; MKL is located through its CMake package
+              # config, i.e. via $MKL_DIR.
+              args="--no-build-isolation"
+              case "${{ runner.os }}" in
+                # Force MSVC; meson prefers any gcc on PATH over falling back to VS.
+                Windows) args="${args} -Csetup-args=--vsenv" ;;
+              esac
+              uv venv buildenv && source buildenv/"${{ env.venv_bin }}"/activate
+              uv pip install meson-python ninja cmake cython
               ;;
           esac
-          uv build --wheel ${args}
+          uv build --wheel --index "$PAGES_URL" ${args}
 
       - name: Repair wheel (Linux)
+        env:
+          UV_PROJECT_ENVIRONMENT: ${{ env.BUILD_VENV }}
         run: |
           mkdir -p wheelhouse
           plat="$(ldd --version | head -1 | awk '{ print $NF }' | tr '.' '_')_$(uname -m)"
-          # auditwheel needs to locate MKL libs to bundle them into the wheel
-          export LD_LIBRARY_PATH="${{ env.MKL_DIR }}/lib:${LD_LIBRARY_PATH:-}"
-          # ILP64: Bundle MKL libs into wheel since PyPI mkl only has LP64
-          # This makes larger wheels but avoids runtime dependency issues
-          uvx auditwheel repair "${{ env.SRC_DIR }}"/dist/*.whl -w wheelhouse \
-              --plat=manylinux_${plat}
+          # Never vendor MKL, ILP64 included: the mkl runtime package ships
+          # libmkl_intel_ilp64.so.3 alongside the LP64 one. Vendoring bundles only
+          # the link-time libs, while MKL dlopen()s its compute kernels
+          # (libmkl_def, libmkl_avx2, libmkl_avx512) at runtime and they would be
+          # missing from the wheel.
+          uv run --locked --only-group build-deps \
+              auditwheel repair "${{ env.SRC_DIR }}"/dist/*.whl -w wheelhouse \
+              --exclude 'libmkl*' --plat=manylinux_${plat} --strip
         if: runner.os == 'Linux'
 
       - name: Show wheel dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
           uvx delvewheel show "${{ env.SRC_DIR }}"/dist/*.whl \
-              --add-path "${{ env.MKL_DIR }}/Library/bin"
+              --add-path "${{ env.MKL_VENV }}/Library/bin"
+
+      - name: Strip symbols (Windows)
+        env:
+          UV_PROJECT_ENVIRONMENT: ${{ env.BUILD_VENV }}
+        run: |
+          # MinGW leaves a COFF symbol table in every .pyd, ~40 MB per scipy wheel (~5 MB
+          # compressed). Only scipy is built with gcc; the MSVC-built packages keep their
+          # debug info in separate .pdb files that never enter the wheel, so they have
+          # nothing to strip. Mirrors upstream's tools/wheels/repair_windows.sh, which
+          # strips for the additional reason that delvewheel cannot name-mangle a .pyd
+          # carrying an overlay -- relevant here only if we ever stop excluding every DLL
+          # from vendoring. Run before delvewheel: patched binaries must not be rewritten
+          # afterwards. Paths stay absolute so that uv keeps resolving against our own
+          # pyproject.toml rather than the one in $SRC_DIR.
+          dist="${{ env.SRC_DIR }}/dist"
+          uv run --locked --only-group build-deps wheel unpack "$dist"/*.whl -d "$dist/unpacked"
+          find "$dist/unpacked" -name '*.pyd' -exec strip {} +
+
+          # 'wheel pack' rewrites RECORD with the post-strip hashes and re-derives the
+          # filename from the tags in WHEEL, so it lands back where the original was.
+          rm -f "$dist"/*.whl
+          uv run --locked --only-group build-deps wheel pack "$dist"/unpacked/* -d "$dist"
+        if: runner.os == 'Windows' && inputs.name == 'scipy'
 
       - name: Repair wheel (Windows)
-        if: runner.os == 'Windows'
+        env:
+          UV_PROJECT_ENVIRONMENT: ${{ env.BUILD_VENV }}
         run: |
           mkdir -p wheelhouse
-          # Exclude mkl_rt.*.dll — MKL runtime DLLs are provided by the mkl pip
-          # package (installed separately in the test step). Bundling mkl_rt
-          # into the wheel causes LoadLibrary failures because its kernel deps
-          # (mkl_intel_thread etc.) aren't bundled alongside it. Glob covers
-          # both mkl_rt.2.dll (mkl 2025.x) and mkl_rt.3.dll (mkl 2026.x).
-          uvx delvewheel repair "${{ env.SRC_DIR }}"/dist/*.whl -w wheelhouse \
-              --add-path "${{ env.MKL_DIR }}/Library/bin" \
-              --exclude "mkl_rt.*.dll" \
-              --exclude libsf_error_state.dll
+          # MKL runtime DLLs are provided by the mkl pip package installed in
+          # the test environment. Exclude all of them: copying only one direct
+          # interface DLL makes delvewheel load it before mkl-service registers
+          # the directory containing the rest of the MKL runtime.
+          uv run --locked --only-group build-deps \
+              delvewheel repair "${{ env.SRC_DIR }}"/dist/*.whl -w wheelhouse \
+              --add-path "${{ env.MKL_VENV }}/Library/bin" \
+              --exclude "mkl_*.dll" --exclude libsf_error_state.dll
+        if: runner.os == 'Windows'
 
-      - name: Set MKL runtime library path (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          # Linux: auditwheel bundles directly-linked libs into numpy.libs/, but
-          # MKL's dispatcher loads computational kernels via dlopen() at runtime.
-          echo "LD_LIBRARY_PATH=${{ env.MKL_DIR }}/lib:${LD_LIBRARY_PATH:-}" >>$GITHUB_ENV
+      - name: Download same-run dependency wheels
+        if: inputs.name != 'mkl-service'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: mkl-service-${{ matrix.python_version }}-${{ runner.os }}
+          path: dependency-wheelhouse/mkl-service
+
+      - name: Download same-run numpy wheels
+        if: inputs.name == 'scipy'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: numpy-${{ matrix.python_version }}-${{ runner.os }}
+          path: dependency-wheelhouse/numpy
 
       - name: Run tests
         run: |
-          # Set up test environment.
-          uv venv testenv && source testenv/"${{ env.venv_bin }}"/activate
-          # --no-deps keeps the test environment exact: mkl is pinned below,
-          # and mkl-service would otherwise resolve from PyPI (upstream's
-          # build), not from our index.
-          uv pip install --no-deps wheelhouse/*.whl
-          # Install MKL runtime package — provides mkl_rt.2.dll, mkl_intel_thread.2.dll,
-          # and other kernel DLLs. numpy's _distributor_init.py registers the DLL
-          # directory automatically on import.
-          uv pip install mkl>="${{ env.MKL_VERSION }}"
+          # Make sure we don't pick up the development MKL libraries.
+          rm -rf "${{ env.MKL_VENV }}"
 
-          case "${{ inputs.name }}" in
+          uv venv testenv && source testenv/"${{ env.venv_bin }}"/activate
+          mapfile -t built_wheels < <(find wheelhouse -maxdepth 1 -name '*.whl' -print)
+          [[ ${#built_wheels[@]} -eq 1 ]] || {
+            echo "::error::Expected one newly built $PACKAGE_NAME wheel"
+            exit 1
+          }
+          dependency_wheels=()
+          if [[ "$PACKAGE_NAME" != "mkl-service" ]]; then
+            mapfile -t mkl_service_wheels < <(
+              find dependency-wheelhouse/mkl-service -maxdepth 1 -name '*.whl' -print
+            )
+            [[ ${#mkl_service_wheels[@]} -eq 1 ]] || {
+              echo "::error::Expected one same-run mkl-service wheel"
+              exit 1
+            }
+            dependency_wheels+=("${mkl_service_wheels[0]}")
+          fi
+          if [[ "$PACKAGE_NAME" == "scipy" ]]; then
+            mapfile -t numpy_wheels < <(
+              find dependency-wheelhouse/numpy -maxdepth 1 -name '*.whl' -print
+            )
+            [[ ${#numpy_wheels[@]} -eq 1 ]] || {
+              echo "::error::Expected one same-run NumPy wheel"
+              exit 1
+            }
+            dependency_wheels+=("${numpy_wheels[0]}")
+          fi
+          uv pip install "${dependency_wheels[@]}" "${built_wheels[@]}" \
+              --index "$PAGES_URL"
+
+          case "$PACKAGE_NAME" in
             numpy)
               uv pip install -r "${{ env.SRC_DIR }}"/requirements/test_requirements.txt
               uv pip install threadpoolctl
-              python tools/numpy_tests.py
+              EXPECT_NUMPY_ILP64="$NUMPY_ILP64" python tools/numpy_tests.py
+              ;;
+
+            scipy)
+              # Only install essential test dependencies, mirroring official wheel builder.
+              # Installing the full set below needs 'dnf -y install libmpc-devel' on py314,
+              # as gmpy2 has no pre-built wheels there and falls back to building from source.
+              uv pip install pytest pytest-xdist threadpoolctl pooch hypothesis
+              EXPECT_SCIPY_ILP64="$SCIPY_ILP64" python tools/scipy_tests.py
               ;;
 
             mkl-service)
@@ -320,110 +400,21 @@ jobs:
 
       - name: Store build information
         run: |
-          cat >wheelhouse/versions-${{ matrix.python_version}}-${{ runner.os }}.json <<EOF
-          {
-            "name": "${{ inputs.name }}",
-            "version": "${{ needs.meta.outputs.version }}",
-            "python": "${{ matrix.python_version }}",
-            "os": "${{ runner.os }}",
-            "mkl": "${{ env.MKL_VERSION }}"
-          }
-          EOF
+          uv run --locked python tools/write_build_info.py "$PACKAGE_NAME" \
+            --version "$PACKAGE_VERSION" \
+            --python "$PYTHON_TAG" \
+            --os "$RUNNER_OS" \
+            --mkl "$MKL_VERSION" \
+            --output "wheelhouse/versions-${PACKAGE_NAME}-${PYTHON_TAG}-${RUNNER_OS}.json"
 
       - name: Archive
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ inputs.name }}-${{ matrix.python_version }}-${{ runner.os }}
           path: |
             wheelhouse/*.whl
             wheelhouse/*.json
           retention-days: 1
-
-  #-----------------------------------------------------------------------------------------------
-  release:
-    needs: [meta, build]
-    if: ${{ needs.meta.outputs.matrix != 'null' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout main branch
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          # Explicitly set ref to include commits from the meta job.
-          # https://github.com/actions/checkout/issues/439#issuecomment-830862188
-          ref: main
-          persist-credentials: true  # Need credentials to push.
-
-      - name: Checkout deployment branch
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          ref: pypi
-          path: pypi
-          persist-credentials: true  # Need credentials to push.
-
-      - name: Set up python
-        uses: astral-sh/setup-uv@681c641aba71e4a1c380be3ab5e12ad51f415867 # v7.1.6
-        with:
-          version-file: "pyproject.toml"
-
-      - name: Fetch wheels
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
-        with:
-          pattern: ${{ inputs.name }}-*
-          path: release
-          merge-multiple: true
-
-      - name: Bump project version
-        run: |
-          uv version --bump patch
-          echo "VERSION=$(uv version --short)" >>$GITHUB_ENV
-
-      - name: Store build metadata
-        run: |
-          tools/store_info.py release/*.json --store build.json
-
-      - name: Commit release data
-        run: |
-          if [[ -z "$(git status --porcelain)" ]]; then
-              echo "No changes to commit"
-              exit 0
-          fi
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add .
-          git commit -m "ci: Prepare release for ${{ inputs.name }}-${{ needs.meta.outputs.version }}"
-          git push origin HEAD:main
-
-      - name: Write release notes
-        run: |
-          uv run tools/release_notes templates/release.md --store build.json >release/release.md
-
-      - name: Release wheels
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create "${VERSION}" --title "${VERSION}" --notes-file release/release.md release/*.whl
-
-      - name: Generate index
-        run: |
-          # Wait 10s for release to get finished.
-          sleep 10
-          uv run tools/make_index2 pypi/${{ inputs.name}}/index.html --token ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Deploy index
-        working-directory: pypi
-        run: |
-          if [[ -z "$(git status --porcelain)" ]]; then
-              echo "No changes to commit"
-              exit 0
-          fi
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add .
-          git commit -m "ci: Add wheels for ${{ inputs.name }}-${{ needs.meta.outputs.version }}"
-          git push origin HEAD:pypi
 
 ...
 # vim: set tw=98:

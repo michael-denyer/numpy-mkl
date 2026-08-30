@@ -2,24 +2,28 @@ name: Build wheels
 
 on:
   workflow_dispatch:
+  pull_request:
   schedule:
     - cron: "15 22 * * 0" # 22.15 UTC every Sunday
 
-permissions:
-  contents: write
-
 jobs:
-  mkl-service:
-    uses: ./.github/workflows/wheels.yml
+  verify:
+    if: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+    permissions:
+      # Reusable-workflow permissions can only stay the same or decrease. The
+      # called workflow contains skipped main-only publication jobs that need
+      # write access, while every PR job inside it explicitly drops to read.
+      contents: write
+    uses: ./.github/workflows/package_set.yml
     with:
-      name: mkl-service
-      repo: IntelPython/mkl-service
-      manylinux: true
+      force-build: true
+      publish: false
 
-  numpy:
-    uses: ./.github/workflows/wheels.yml
+  publish:
+    if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+    permissions:
+      contents: write
+    uses: ./.github/workflows/package_set.yml
     with:
-      name: numpy
-      repo: numpy/numpy
-      manylinux: true
-    needs: mkl-service
+      force-build: false
+      publish: true

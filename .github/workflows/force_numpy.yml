@@ -1,16 +1,24 @@
-name: Rebuild numpy
+name: Rebuild NumPy matched set
 
 on:
   workflow_dispatch:
 
-permissions:
-  contents: write
-
+# Publishing one package is unsafe: this shortcut forces and verifies the matched set.
 jobs:
-  numpy:
-    uses: ./.github/workflows/wheels.yml
+  verify:
+    if: ${{ github.ref != 'refs/heads/main' }}
+    permissions:
+      contents: write
+    uses: ./.github/workflows/package_set.yml
     with:
-      name: numpy
-      repo: numpy/numpy
       force-build: true
-      manylinux: true
+      publish: false
+
+  publish:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    permissions:
+      contents: write
+    uses: ./.github/workflows/package_set.yml
+    with:
+      force-build: true
+      publish: true

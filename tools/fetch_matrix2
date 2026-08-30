@@ -7,6 +7,7 @@ from pathlib import Path
 
 import requests
 import yaml
+from build_recipe import recipe_hash
 from packaging.specifiers import SpecifierSet
 from packaging.version import InvalidVersion, Version
 from store_info import Build, fetch_store
@@ -19,6 +20,17 @@ REPO = {
     'numpy': 'numpy/numpy',
     'scipy': 'scipy/scipy',
     'mkl-service': 'IntelPython/mkl-service',
+}
+RUNNER_POLICY_FIELDS = {
+    'runner',
+    'container',
+    'os',
+    'numpy_blas',
+    'numpy_ilp64',
+    'numpy_symbol_suffix',
+    'scipy_blas',
+    'scipy_ilp64',
+    'scipy_cython_blas_abi',
 }
 
 
@@ -54,9 +66,23 @@ class Config:
             self.config = yaml.safe_load(f)
 
         self.runners = self.parse_config('runners')
+        self.validate_runners()
         self.version = self.parse_config('version')
         self.python_versions = self.parse_config('python_versions')
         self.force_build = self.parse_config('force_build')
+
+    def validate_runners(self):
+        for runner in self.runners:
+            if not isinstance(runner, dict):
+                continue
+            missing = RUNNER_POLICY_FIELDS - set(runner)
+            if missing:
+                raise ValueError(f'Runner policy is missing fields: {sorted(missing)}')
+            if runner['os'] not in {'Linux', 'Windows'}:
+                raise ValueError(f"Unknown runner policy OS {runner['os']!r}")
+            for field in ('numpy_ilp64', 'scipy_ilp64'):
+                if not isinstance(runner[field], bool):
+                    raise ValueError(f'Runner policy {field} must be boolean')
 
     def parse_config(self, key):
         if self.package_name in self.config and key in self.config[self.package_name]:
@@ -128,6 +154,10 @@ class FetchBuildMatrix:
         self.store = store
 
     def fetch_os(self, runner):
+        if isinstance(runner, dict):
+            return runner['os'].lower()
+        if isinstance(runner, (list, tuple)):
+            runner = runner[0]
         if runner.startswith('ubuntu'):
             return 'linux'
         if runner.startswith('windows'):
@@ -141,28 +171,46 @@ class FetchBuildMatrix:
             'name': self.package_name,
             'version': self.package_version,
             'python': python_version,
-            'os': self.fetch_os(runner[0]),
+            'os': self.fetch_os(runner),
             'mkl': None,
+            'recipe': recipe_hash(self.package_name),
         }
         return Build(info).exclude(fetch_store(self.store))
 
-    def fetch_matrix(self):
+    @staticmethod
+    def matrix_entry(runner, python_version):
+        if isinstance(runner, dict):
+            return {**runner, 'python_version': python_version}
+        if isinstance(runner, str):
+            return {
+                'runner': runner,
+                'python_version': python_version,
+                'container': None,
+            }
+        return {
+            'runner': runner[0],
+            'python_version': python_version,
+            'container': runner[1],
+        }
+
+    def fetch_matrix(self, exclude_cached=True):
         include = []
         for runner in self.config.runners:
             for python_version in self.python_versions:
-                if self.exclude(python_version, runner):
+                if exclude_cached and self.exclude(python_version, runner):
                     continue
-                entry = {
-                    'runner': runner[0],
-                    'python_version': python_version,
-                    'container': runner[1],
-                }
-                include.append(entry)
+                include.append(self.matrix_entry(runner, python_version))
         return {'include': include} if include else None
 
     def print(self):
         matrix = self.fetch_matrix()
-        out = {'version': self.package_version, 'tag': self.git_tag, 'matrix': matrix}
+        out = {
+            'name': self.package_name,
+            'version': self.package_version,
+            'tag': self.git_tag,
+            'matrix': matrix,
+            'full_matrix': self.fetch_matrix(exclude_cached=False),
+        }
         print(json.dumps(out))
 
 

@@ -1,4 +1,4 @@
-name: Rebuild mkl-service matched set
+name: Rebuild SciPy matched set
 
 on:
   workflow_dispatch:

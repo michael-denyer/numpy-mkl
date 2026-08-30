@@ -1,24 +1,32 @@
 name: Link external dependencies
 
 on:
+  workflow_call:
   workflow_dispatch:
   schedule:
-    - cron: "15 21 * * 0" # 21.15 UTC every Sunday
+    - cron: "15 21 * * 3" # 21.15 UTC every Wednesday
 
 permissions:
   contents: write
+
+concurrency:
+  group: package-set-publication
+  cancel-in-progress: false
+
+env:
+  PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
 
 jobs:
   links:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: main
           persist-credentials: false
 
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: pypi
           path: pypi
@@ -29,6 +37,7 @@ jobs:
           main/tools/link_pypi pypi/
 
       - name: Commit index
+        id: commit
         working-directory: pypi
         run: |
           if [[ -z "$(git status --porcelain)" ]]; then
@@ -40,3 +49,23 @@ jobs:
           git add .
           git commit -m "ci: Update external links"
           git push origin HEAD:pypi
+          echo "pushed=true" >>$GITHUB_OUTPUT
+
+      - name: Wait for index deployment
+        if: steps.commit.outputs.pushed == 'true'
+        run: |
+          # Pushing to 'pypi' only queues the Pages build. Wait until the new index is
+          # actually served, so that a build chained after this workflow resolves against
+          # it. Poll a file this commit changed, so the check can't pass on stale content.
+          file=$(git -C pypi show --name-only --format= HEAD | head -1)
+          url="${PAGES_URL}/${file%/index.html}/"
+          for _ in $(seq 60); do
+            if served=$(curl -sSf -H 'Cache-Control: no-cache' "$url") \
+                && [[ "$served" == "$(cat "pypi/${file}")" ]]; then
+              echo "Index is live: $url"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Updated index was not served within 10 minutes"
+          exit 1

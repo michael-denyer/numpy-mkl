@@ -3,10 +3,11 @@
 import argparse
 import contextlib
 import json
+import re
 from pathlib import Path
 
 with contextlib.suppress(ImportError):
-    from packaging.version import Version
+    from packaging.version import InvalidVersion, Version
 
 
 class Build:
@@ -21,15 +22,42 @@ class Build:
         self.python = self.info['python']
         self.os = self.info['os'].lower()
         self.mkl = self.info['mkl']
+        self.recipe = self.info.get('recipe')
 
         self.key = '-'.join([self.name, self.version, self.python, self.os])
 
+    def has_valid_recipe(self):
+        return (
+            isinstance(self.recipe, str)
+            and re.fullmatch(r'sha256:[0-9a-f]{64}', self.recipe) is not None
+        )
+
     def exclude(self, store, check_mkl=False):
-        bump_mkl = check_mkl and Version(self.mkl) > Version(store[self.key]['mkl'])
-        return self.key in store and not bump_mkl
+        if self.key not in store or not self.has_valid_recipe():
+            return False
+
+        stored = store[self.key]
+        if check_mkl:
+            stored_mkl = stored.get('mkl')
+            if self.mkl is None or stored_mkl is None:
+                return False
+            try:
+                bump_mkl = Version(self.mkl) > Version(stored_mkl)
+            except (InvalidVersion, TypeError):
+                return False
+        else:
+            bump_mkl = False
+        stale_recipe = stored.get('recipe') != self.recipe
+        return not bump_mkl and not stale_recipe
 
     def merge_with(self, store):
-        store[self.key] = {'mkl': self.mkl}
+        if self.recipe is None:
+            raise ValueError('Build metadata is missing its recipe digest')
+        if not self.has_valid_recipe():
+            raise ValueError(
+                f'Build metadata has invalid recipe digest {self.recipe!r}'
+            )
+        store[self.key] = {'mkl': self.mkl, 'recipe': self.recipe}
 
 
 def fetch_store(path):
