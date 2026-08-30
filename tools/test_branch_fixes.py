@@ -184,6 +184,40 @@ class TestWorkflowContracts(unittest.TestCase):
         self.assertIn('uses: ./.github/workflows/package_set.yml', force_all)
         self.assertEqual(force_all.count('force-build: true'), 2)
 
+    def test_package_set_callers_allow_nested_publication_permissions(self):
+        for name in (
+            'build_wheels.yml',
+            'force_all.yml',
+            'force_mkl_service.yml',
+            'force_numpy.yml',
+            'force_scipy.yml',
+        ):
+            workflow = yaml.safe_load(self.workflow(name))
+            for job_name, job in workflow['jobs'].items():
+                if job.get('uses') != './.github/workflows/package_set.yml':
+                    continue
+                with self.subTest(workflow=name, job=job_name):
+                    self.assertEqual(job['permissions']['contents'], 'write')
+
+        coordinator = yaml.safe_load(self.workflow('package_set.yml'))
+        for job_name in (
+            'preflight',
+            'plan',
+            'mkl-service',
+            'numpy',
+            'scipy',
+            'verify-package-set',
+        ):
+            with self.subTest(coordinator_job=job_name):
+                self.assertEqual(
+                    coordinator['jobs'][job_name]['permissions']['contents'], 'read'
+                )
+        for job_name in ('links', 'release'):
+            with self.subTest(coordinator_job=job_name):
+                self.assertEqual(
+                    coordinator['jobs'][job_name]['permissions']['contents'], 'write'
+                )
+
     def test_dependency_artifacts_are_mandatory_and_no_published_repo_fallback(self):
         workflow = self.workflow('wheels.yml')
 

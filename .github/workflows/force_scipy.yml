@@ -8,7 +8,7 @@ jobs:
   verify:
     if: ${{ github.ref != 'refs/heads/main' }}
     permissions:
-      contents: read
+      contents: write
     uses: ./.github/workflows/package_set.yml
     with:
       force-build: true

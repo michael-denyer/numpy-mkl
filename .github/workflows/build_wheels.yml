@@ -10,7 +10,10 @@ jobs:
   verify:
     if: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
     permissions:
-      contents: read
+      # Reusable-workflow permissions can only stay the same or decrease. The
+      # called workflow contains skipped main-only publication jobs that need
+      # write access, while every PR job inside it explicitly drops to read.
+      contents: write
     uses: ./.github/workflows/package_set.yml
     with:
       force-build: true
