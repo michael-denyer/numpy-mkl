@@ -1,6 +1,19 @@
 import os
 import sys
 
+
+def finish_test_process(passed, runner_os):
+    if runner_os == 'Linux':
+        # The full suite can leave MKL/OpenMP state that races with extension
+        # destructors during interpreter finalization. Preserve pytest's result
+        # and stop this disposable test process before that native teardown.
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(int(not passed))
+        return
+    sys.exit(not passed)
+
+
 # Guard required: on Windows multiprocessing.Pool uses 'spawn', which reimports
 # __main__ in each worker. Without this guard the workers would re-execute
 # scipy.test(), causing recursive test runs and a deadlock in test_pool.
@@ -61,4 +74,4 @@ if __name__ == '__main__':
             extra_args += ['-k', 'not test_support_moments_sample']
 
     passed = scipy.test(extra_argv=extra_args or None)
-    sys.exit(not passed)
+    finish_test_process(passed, runner_os)

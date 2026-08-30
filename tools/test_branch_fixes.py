@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import json
+import os
 import runpy
 import sys
 import tempfile
@@ -8,7 +9,7 @@ import unittest
 import zipfile
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import yaml
 
@@ -280,6 +281,26 @@ class TestWorkflowContracts(unittest.TestCase):
         self.assertIn("label='full'", tests)
         self.assertIn("'--timeout=1800'", tests)
         self.assertNotIn("'-k'", tests)
+
+    def test_scipy_linux_runner_preserves_result_before_native_teardown(self):
+        finish = runpy.run_path(str(TOOLS / 'scipy_tests.py'))['finish_test_process']
+
+        for passed, expected_status in ((True, 0), (False, 1)):
+            with (
+                self.subTest(passed=passed),
+                patch.object(sys, 'stdout', Mock()) as stdout,
+                patch.object(sys, 'stderr', Mock()) as stderr,
+                patch.object(os, '_exit') as immediate_exit,
+            ):
+                finish(passed, 'Linux')
+
+                stdout.flush.assert_called_once_with()
+                stderr.flush.assert_called_once_with()
+                immediate_exit.assert_called_once_with(expected_status)
+
+        with self.assertRaises(SystemExit) as exited:
+            finish(False, 'Windows')
+        self.assertEqual(exited.exception.code, True)
 
     def test_nix_stays_empty_until_complete_fork_pins_exist(self):
         pins = (ROOT / 'nix/wheels.nix').read_text()
