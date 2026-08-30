@@ -27,6 +27,7 @@ PACKAGE_FILES = {
         'tools/test_mkl_init_helper.py',
     ),
     'numpy': (
+        'patches/numpy/cython_3_3_0_limited_api.patch',
         'patches/numpy/init_mkl.patch',
         'tools/numpy_tests.py',
     ),

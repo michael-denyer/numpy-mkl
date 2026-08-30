@@ -150,6 +150,14 @@ class TestBuildIdentity(unittest.TestCase):
             self.assertEqual(json.loads(output.read_text()), build)
             self.assertRegex(build['recipe'], r'^sha256:[0-9a-f]{64}$')
 
+    def test_numpy_cython_330_workaround_is_upstream_and_hashed(self):
+        relative = 'patches/numpy/cython_3_3_0_limited_api.patch'
+
+        self.assertIn(relative, build_recipe.PACKAGE_FILES['numpy'])
+        patch = (ROOT / relative).read_text()
+        self.assertIn('github.com/cython/cython/issues/7914', patch)
+        self.assertIn('Version("3.3.0")', patch)
+
 
 class TestWorkflowContracts(unittest.TestCase):
     def workflow(self, name):
