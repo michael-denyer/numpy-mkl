@@ -274,6 +274,26 @@ class TestWorkflowContracts(unittest.TestCase):
         self.assertIn('tools/test_branch_fixes.py', coordinator)
         self.assertIn('ruff==0.14.6 format --check', coordinator)
 
+    def test_skipped_links_cannot_skip_package_set_verification(self):
+        coordinator = yaml.safe_load(self.workflow('package_set.yml'))
+
+        self.assertEqual(
+            coordinator['jobs']['plan']['outputs']['has_builds'],
+            '${{ steps.plan.outputs.has_builds }}',
+        )
+        for job_name in (
+            'mkl-service',
+            'numpy',
+            'scipy',
+            'verify-package-set',
+            'release',
+        ):
+            condition = coordinator['jobs'][job_name]['if']
+            with self.subTest(job=job_name):
+                self.assertIn('always()', condition)
+                self.assertIn("needs.plan.result == 'success'", condition)
+                self.assertIn("needs.plan.outputs.has_builds == 'true'", condition)
+
     def test_scipy_license_and_locked_pkgconf_are_preserved(self):
         workflow = self.workflow('wheels.yml')
 

@@ -49,6 +49,7 @@ jobs:
     permissions:
       contents: read
     outputs:
+      has_builds: ${{ steps.plan.outputs.has_builds }}
       matrix: ${{ steps.plan.outputs.matrix }}
       mkl_service_tag: ${{ steps.plan.outputs.mkl_service_tag }}
       mkl_service_version: ${{ steps.plan.outputs.mkl_service_version }}
@@ -82,6 +83,7 @@ jobs:
             "${force_args[@]}" >plan.json
           yq -P -o yaml plan.json
 
+          echo "has_builds=$(jq -r '.matrix != null' plan.json)" >>"$GITHUB_OUTPUT"
           echo "matrix=$(jq -c '.matrix' plan.json)" >>"$GITHUB_OUTPUT"
           for package in mkl-service numpy scipy; do
             output_name=${package//-/_}
@@ -92,7 +94,7 @@ jobs:
           done
 
   mkl-service:
-    if: ${{ needs.plan.outputs.matrix != 'null' }}
+    if: ${{ always() && needs.plan.result == 'success' && needs.plan.outputs.has_builds == 'true' }}
     needs: plan
     permissions:
       contents: read
@@ -105,7 +107,7 @@ jobs:
       version: ${{ needs.plan.outputs.mkl_service_version }}
 
   numpy:
-    if: ${{ needs.plan.outputs.matrix != 'null' }}
+    if: ${{ always() && needs.plan.result == 'success' && needs.mkl-service.result == 'success' && needs.plan.outputs.has_builds == 'true' }}
     needs: [plan, mkl-service]
     permissions:
       contents: read
@@ -118,7 +120,7 @@ jobs:
       version: ${{ needs.plan.outputs.numpy_version }}
 
   scipy:
-    if: ${{ needs.plan.outputs.matrix != 'null' }}
+    if: ${{ always() && needs.plan.result == 'success' && needs.mkl-service.result == 'success' && needs.numpy.result == 'success' && needs.plan.outputs.has_builds == 'true' }}
     needs: [plan, mkl-service, numpy]
     permissions:
       contents: read
@@ -131,7 +133,7 @@ jobs:
       version: ${{ needs.plan.outputs.scipy_version }}
 
   verify-package-set:
-    if: ${{ needs.plan.outputs.matrix != 'null' }}
+    if: ${{ always() && needs.plan.result == 'success' && needs.mkl-service.result == 'success' && needs.numpy.result == 'success' && needs.scipy.result == 'success' && needs.plan.outputs.has_builds == 'true' }}
     needs: [plan, mkl-service, numpy, scipy]
     permissions:
       contents: read
@@ -140,7 +142,7 @@ jobs:
       matrix: ${{ needs.plan.outputs.matrix }}
 
   release:
-    if: ${{ inputs.publish && github.ref == 'refs/heads/main' && needs.plan.outputs.matrix != 'null' }}
+    if: ${{ always() && inputs.publish && github.ref == 'refs/heads/main' && needs.plan.result == 'success' && needs.verify-package-set.result == 'success' && needs.plan.outputs.has_builds == 'true' }}
     needs: [plan, verify-package-set]
     runs-on: ubuntu-latest
     permissions:
