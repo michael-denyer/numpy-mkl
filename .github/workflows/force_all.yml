@@ -3,42 +3,21 @@ name: Rebuild all
 on:
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
-  # See force_numpy.yml: the test step resolves against our index, which must
-  # carry the MKL runtime the built wheels pin.
-  links:
-    uses: ./.github/workflows/links.yml
-
-  mkl-service:
-    uses: ./.github/workflows/wheels.yml
+  verify:
+    if: ${{ github.ref != 'refs/heads/main' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/package_set.yml
     with:
-      name: mkl-service
-      repo: IntelPython/mkl-service
       force-build: true
-    needs: links
+      publish: false
 
-  numpy:
-    uses: ./.github/workflows/wheels.yml
+  publish:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    permissions:
+      contents: write
+    uses: ./.github/workflows/package_set.yml
     with:
-      name: numpy
-      repo: numpy/numpy
       force-build: true
-    needs: [links, mkl-service]
-
-  scipy:
-    uses: ./.github/workflows/wheels.yml
-    with:
-      name: scipy
-      repo: scipy/scipy
-      force-build: true
-    needs: [links, mkl-service, numpy]
-
-  verify-package-set:
-    if: ${{ needs.scipy.outputs.matrix != 'null' }}
-    uses: ./.github/workflows/verify_package_set.yml
-    with:
-      matrix: ${{ needs.scipy.outputs.matrix }}
-    needs: [mkl-service, numpy, scipy]
+      publish: true

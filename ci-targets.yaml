@@ -6,8 +6,24 @@ defaults:
     - "3.14"
 
   runners:
-    - ["ubuntu-latest", "quay.io/pypa/manylinux_2_28_x86_64"]
-    - ["windows-2022", null]
+    - runner: ubuntu-latest
+      container: quay.io/pypa/manylinux_2_28_x86_64
+      os: Linux
+      numpy_blas: mkl-dynamic-ilp64-iomp
+      numpy_ilp64: true
+      numpy_symbol_suffix: _64
+      scipy_blas: mkl-dynamic-lp64-seq
+      scipy_ilp64: true
+      scipy_cython_blas_abi: lp64
+    - runner: windows-2022
+      container: null
+      os: Windows
+      numpy_blas: mkl-dynamic-ilp64-seq
+      numpy_ilp64: true
+      numpy_symbol_suffix: _64
+      scipy_blas: mkl-sdl
+      scipy_ilp64: false
+      scipy_cython_blas_abi: null
 
   version: latest
   force_build: false

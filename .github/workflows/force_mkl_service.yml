@@ -1,22 +1,24 @@
-name: Rebuild mkl-service
+name: Rebuild mkl-service matched set
 
 on:
   workflow_dispatch:
 
-permissions:
-  contents: write
-
+# Publishing one package is unsafe: this shortcut forces and verifies the matched set.
 jobs:
-  # See force_numpy.yml: the test step resolves against our index, which must
-  # carry the MKL runtime the built wheel pins.
-  links:
-    uses: ./.github/workflows/links.yml
-
-  mkl-service:
-    uses: ./.github/workflows/wheels.yml
+  verify:
+    if: ${{ github.ref != 'refs/heads/main' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/package_set.yml
     with:
-      name: mkl-service
-      repo: IntelPython/mkl-service
       force-build: true
-      # version: 2.8.0
-    needs: links
+      publish: false
+
+  publish:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    permissions:
+      contents: write
+    uses: ./.github/workflows/package_set.yml
+    with:
+      force-build: true
+      publish: true

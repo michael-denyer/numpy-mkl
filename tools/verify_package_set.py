@@ -13,6 +13,20 @@ def normalize_distribution(name):
     return name.lower().replace('_', '-').replace('.', '-')
 
 
+def require(condition, message):
+    if not condition:
+        raise AssertionError(message)
+
+
+def parse_bool(value, name):
+    normalized = value.lower() if isinstance(value, str) else value
+    if normalized in (True, 'true'):
+        return True
+    if normalized in (False, 'false'):
+        return False
+    raise ValueError(f'{name} must be true or false, got {value!r}')
+
+
 @dataclass(frozen=True)
 class WheelIdentity:
     distribution: str
@@ -24,7 +38,9 @@ class WheelIdentity:
         path = path.resolve(strict=True)
         with zipfile.ZipFile(path) as wheel:
             metadata_names = [
-                name for name in wheel.namelist() if name.endswith('.dist-info/METADATA')
+                name
+                for name in wheel.namelist()
+                if name.endswith('.dist-info/METADATA')
             ]
             if len(metadata_names) != 1:
                 raise AssertionError(
@@ -51,7 +67,7 @@ class WheelIdentity:
             )
 
 
-def verify_package_set(wheels, runner_os):
+def verify_package_set(wheels, runner_os, expect_numpy_ilp64, expect_scipy_ilp64):
     identities = tuple(
         WheelIdentity.read(distribution, path) for distribution, path in wheels.items()
     )
@@ -67,19 +83,30 @@ def verify_package_set(wheels, runner_os):
     config = np.show_config(mode='dicts')
     blas_name = config.get('Build Dependencies', {}).get('blas', {}).get('name', '')
     lapack_name = config.get('Build Dependencies', {}).get('lapack', {}).get('name', '')
-    assert 'mkl' in blas_name.lower(), f'NumPy BLAS must be MKL, got {blas_name}'
-    assert 'mkl' in lapack_name.lower(), f'NumPy LAPACK must be MKL, got {lapack_name}'
-    assert HAS_LAPACK64, f'{runner_os} NumPy wheel must use ILP64'
+    require(runner_os in {'Linux', 'Windows'}, f'Unexpected runner OS {runner_os!r}')
+    require('mkl' in blas_name.lower(), f'NumPy BLAS must be MKL, got {blas_name}')
+    require(
+        'mkl' in lapack_name.lower(), f'NumPy LAPACK must be MKL, got {lapack_name}'
+    )
+    require(
+        HAS_LAPACK64 is expect_numpy_ilp64,
+        f'{runner_os} NumPy ILP64={HAS_LAPACK64}, expected {expect_numpy_ilp64}',
+    )
 
-    assert blas.HAS_LP64, f'{runner_os} SciPy wheel must expose LP64 BLAS'
-    if runner_os == 'Linux':
-        assert blas.HAS_ILP64, 'Linux SciPy wheel must expose ILP64 BLAS'
-        assert blas.get_blas_funcs('gemm', ilp64=True).int_dtype.name == 'int64'
-    elif runner_os == 'Windows':
-        assert not blas.HAS_ILP64, 'Windows SciPy wheel must remain LP64'
-    else:
-        raise AssertionError(f'Unexpected runner OS {runner_os!r}')
-    assert blas.get_blas_funcs('gemm', ilp64=False).int_dtype.name == 'int32'
+    require(blas.HAS_LP64, f'{runner_os} SciPy wheel must expose LP64 BLAS')
+    require(
+        blas.HAS_ILP64 is expect_scipy_ilp64,
+        f'{runner_os} SciPy ILP64={blas.HAS_ILP64}, expected {expect_scipy_ilp64}',
+    )
+    if expect_scipy_ilp64:
+        require(
+            blas.get_blas_funcs('gemm', ilp64=True).int_dtype.name == 'int64',
+            f'{runner_os} SciPy ILP64 BLAS must use int64',
+        )
+    require(
+        blas.get_blas_funcs('gemm', ilp64=False).int_dtype.name == 'int32',
+        f'{runner_os} SciPy LP64 BLAS must use int32',
+    )
 
     matrix = np.array([[4.0, 1.0], [1.0, 3.0]])
     rhs = np.array([1.0, 2.0])
@@ -93,6 +120,12 @@ def main():
     parser.add_argument('--numpy', required=True, type=Path)
     parser.add_argument('--scipy', required=True, type=Path)
     parser.add_argument('--runner-os', default=os.environ.get('RUNNER_OS'))
+    parser.add_argument(
+        '--expect-numpy-ilp64', default=os.environ.get('EXPECT_NUMPY_ILP64')
+    )
+    parser.add_argument(
+        '--expect-scipy-ilp64', default=os.environ.get('EXPECT_SCIPY_ILP64')
+    )
     args = parser.parse_args()
 
     verify_package_set(
@@ -102,6 +135,8 @@ def main():
             'scipy': args.scipy,
         },
         args.runner_os,
+        parse_bool(args.expect_numpy_ilp64, 'EXPECT_NUMPY_ILP64'),
+        parse_bool(args.expect_scipy_ilp64, 'EXPECT_SCIPY_ILP64'),
     )
 
 

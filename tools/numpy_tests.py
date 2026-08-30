@@ -3,10 +3,6 @@ import sys
 from pathlib import Path
 
 if os.environ.get('RUNNER_OS') == 'Windows':
-    mkl_bin = Path(sys.prefix) / 'Library' / 'bin'
-    if mkl_bin.is_dir():
-        os.add_dll_directory(str(mkl_bin))
-
     # GH 20391
     (Path(sys.prefix) / 'libs').mkdir(parents=True, exist_ok=True)
 
@@ -18,15 +14,28 @@ config = np.show_config(mode='dicts')
 blas_name = config.get('Build Dependencies', {}).get('blas', {}).get('name', '')
 lapack_name = config.get('Build Dependencies', {}).get('lapack', {}).get('name', '')
 runner_os = os.environ.get('RUNNER_OS', '')
+expect_ilp64_raw = os.environ.get('EXPECT_NUMPY_ILP64', '').lower()
+expect_ilp64 = expect_ilp64_raw == 'true'
 
-assert runner_os in {'Linux', 'Windows'}, (
-    f'RUNNER_OS must identify a configured build platform, got {runner_os!r}'
+
+def require(condition, message):
+    if not condition:
+        raise AssertionError(message)
+
+
+require(
+    runner_os in {'Linux', 'Windows'},
+    f'RUNNER_OS must identify a configured build platform, got {runner_os!r}',
 )
-assert 'mkl' in blas_name.lower(), f'BLAS must be MKL, got {blas_name}'
-assert 'mkl' in lapack_name.lower(), f'LAPACK must be MKL, got {lapack_name}'
-assert HAS_LAPACK64, (
-    f'{runner_os} NumPy wheel must use ILP64, but HAS_LAPACK64={HAS_LAPACK64} '
-    f'and BLAS={blas_name}'
+require(
+    expect_ilp64_raw in {'true', 'false'},
+    f'EXPECT_NUMPY_ILP64 must be true or false, got {expect_ilp64_raw!r}',
+)
+require('mkl' in blas_name.lower(), f'BLAS must be MKL, got {blas_name}')
+require('mkl' in lapack_name.lower(), f'LAPACK must be MKL, got {lapack_name}')
+require(
+    HAS_LAPACK64 is expect_ilp64,
+    f'{runner_os} NumPy ILP64={HAS_LAPACK64}, expected {expect_ilp64}; BLAS={blas_name}',
 )
 
 a = np.array([[4.0, 1.0], [1.0, 3.0]])

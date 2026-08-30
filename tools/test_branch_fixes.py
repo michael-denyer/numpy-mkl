@@ -16,19 +16,23 @@ TOOLS = ROOT / 'tools'
 sys.path.insert(0, str(TOOLS))
 
 import build_recipe  # noqa: E402
+import package_set_plan  # noqa: E402
 import verify_package_set  # noqa: E402
 from store_info import Build  # noqa: E402
 
+RECIPE = f'sha256:{"a" * 64}'
+OLD_RECIPE = f'sha256:{"b" * 64}'
+
 
 class TestBuildIdentity(unittest.TestCase):
-    def build(self, recipe='sha256:current'):
+    def build(self, recipe=RECIPE, mkl='2026.1.0'):
         return Build(
             {
                 'name': 'numpy',
                 'version': '2.5.2',
                 'python': 'cp312',
                 'os': 'Linux',
-                'mkl': '2026.1.0',
+                'mkl': mkl,
                 'recipe': recipe,
             }
         )
@@ -37,7 +41,7 @@ class TestBuildIdentity(unittest.TestCase):
         store = {
             'numpy-2.5.2-cp312-linux': {
                 'mkl': '2026.1.0',
-                'recipe': 'sha256:current',
+                'recipe': RECIPE,
             }
         }
 
@@ -47,7 +51,7 @@ class TestBuildIdentity(unittest.TestCase):
         store = {
             'numpy-2.5.2-cp312-linux': {
                 'mkl': '2026.1.0',
-                'recipe': 'sha256:old',
+                'recipe': OLD_RECIPE,
             }
         }
 
@@ -58,10 +62,21 @@ class TestBuildIdentity(unittest.TestCase):
 
         self.assertFalse(self.build().exclude(store))
 
-    def test_legacy_caller_keeps_coordinate_only_behavior(self):
+    def test_missing_recipe_fails_closed(self):
         store = {'numpy-2.5.2-cp312-linux': {'mkl': '2026.1.0'}}
 
-        self.assertTrue(self.build(recipe=None).exclude(store))
+        self.assertFalse(self.build(recipe=None).exclude(store))
+
+    def test_empty_and_malformed_recipes_fail_closed(self):
+        store = {'numpy-2.5.2-cp312-linux': {'mkl': '2026.1.0', 'recipe': RECIPE}}
+
+        self.assertFalse(self.build(recipe='').exclude(store))
+        self.assertFalse(self.build(recipe='sha256:not-a-digest').exclude(store))
+
+    def test_unknown_mkl_with_mkl_check_rebuilds(self):
+        store = {'numpy-2.5.2-cp312-linux': {'mkl': '2026.1.0', 'recipe': RECIPE}}
+
+        self.assertFalse(self.build(mkl=None).exclude(store, check_mkl=True))
 
     def test_force_bypasses_matching_store(self):
         fetch_matrix = runpy.run_path(str(TOOLS / 'fetch_matrix2'))
@@ -77,18 +92,24 @@ class TestBuildIdentity(unittest.TestCase):
         self.build().merge_with(store)
         self.assertEqual(
             store['numpy-2.5.2-cp312-linux'],
-            {'mkl': '2026.1.0', 'recipe': 'sha256:current'},
+            {'mkl': '2026.1.0', 'recipe': RECIPE},
         )
 
         with self.assertRaisesRegex(ValueError, 'missing its recipe digest'):
             self.build(recipe=None).merge_with(store)
+        with self.assertRaisesRegex(ValueError, 'invalid recipe digest'):
+            self.build(recipe='').merge_with(store)
 
     def test_digest_is_deterministic_and_package_specific(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
             recipe_files = {
                 *build_recipe.COMMON_FILES,
-                *(path for files in build_recipe.PACKAGE_FILES.values() for path in files),
+                *(
+                    path
+                    for files in build_recipe.PACKAGE_FILES.values()
+                    for path in files
+                ),
             }
             for relative in recipe_files:
                 path = root / relative
@@ -121,49 +142,74 @@ class TestWorkflowContracts(unittest.TestCase):
                 self.assertIsInstance(yaml.safe_load(path.read_text()), dict)
 
     def test_pages_url_uses_current_repository_context(self):
-        for name in ('links.yml', 'wheels.yml', 'verify_package_set.yml'):
+        for name in (
+            'links.yml',
+            'package_set.yml',
+            'wheels.yml',
+            'verify_package_set.yml',
+        ):
             with self.subTest(workflow=name):
                 workflow = self.workflow(name)
                 self.assertIn('${{ github.repository_owner }}.github.io', workflow)
                 self.assertIn('${{ github.event.repository.name }}', workflow)
 
-    def test_feature_branch_forces_all_packages_and_verifies_final_set(self):
-        reusable = self.workflow('wheels.yml')
+    def test_publication_is_owned_after_exact_set_verification(self):
         orchestrator = self.workflow('build_wheels.yml')
+        coordinator = self.workflow('package_set.yml')
+        reusable = self.workflow('wheels.yml')
         verifier = self.workflow('verify_package_set.yml')
 
-        self.assertIn("inputs.force-build || github.ref != 'refs/heads/main'", reusable)
-        for package in ('mkl-service', 'numpy', 'scipy'):
-            self.assertIn(f'name: {package}', orchestrator)
-        self.assertIn("github.ref != 'refs/heads/main'", orchestrator)
-        self.assertIn('uses: ./.github/workflows/verify_package_set.yml', orchestrator)
-        self.assertIn('needs: [mkl-service, numpy, scipy]', orchestrator)
+        self.assertIn('uses: ./.github/workflows/package_set.yml', orchestrator)
+        self.assertIn('pull_request:', orchestrator)
+        self.assertNotIn('\n  release:', reusable)
+        self.assertIn('uses: ./.github/workflows/verify_package_set.yml', coordinator)
+        release = coordinator.index('\n  release:')
+        verify = coordinator.index('\n  verify-package-set:')
+        self.assertGreater(release, verify)
+        self.assertIn('needs: [plan, verify-package-set]', coordinator)
+        self.assertIn("github.ref == 'refs/heads/main'", coordinator)
         self.assertIn('Expected one mkl-service wheel', verifier)
         self.assertIn('Expected one NumPy wheel', verifier)
         self.assertIn('Expected one SciPy wheel', verifier)
         self.assertIn('tools/verify_package_set.py', verifier)
 
-    def test_single_package_force_workflows_keep_index_fallback(self):
+    def test_every_force_workflow_routes_through_package_set(self):
         for name in ('force_mkl_service.yml', 'force_numpy.yml', 'force_scipy.yml'):
             with self.subTest(workflow=name):
                 workflow = self.workflow(name)
+                self.assertIn('uses: ./.github/workflows/package_set.yml', workflow)
                 self.assertIn('force-build: true', workflow)
-                self.assertNotIn('verify_package_set.yml', workflow)
 
         force_all = self.workflow('force_all.yml')
-        self.assertEqual(force_all.count('force-build: true'), 3)
-        self.assertIn('verify_package_set.yml', force_all)
+        self.assertIn('uses: ./.github/workflows/package_set.yml', force_all)
+        self.assertEqual(force_all.count('force-build: true'), 2)
+
+    def test_dependency_artifacts_are_mandatory_and_no_published_repo_fallback(self):
+        workflow = self.workflow('wheels.yml')
+
+        self.assertNotIn('continue-on-error', workflow)
+        self.assertNotIn('nullglob', workflow)
+        self.assertIn('Expected one same-run mkl-service wheel', workflow)
+        self.assertIn('Expected one same-run NumPy wheel', workflow)
+        self.assertIn(
+            'versions-${PACKAGE_NAME}-${PYTHON_TAG}-${RUNNER_OS}.json', workflow
+        )
 
     def test_tests_do_not_hot_copy_source_into_installed_package(self):
         workflow = self.workflow('wheels.yml')
 
-        self.assertNotIn('helper=$(python tools/get_file_in_pkg _init_helper.py', workflow)
-        self.assertIn('dependency-wheelhouse/*.whl', workflow)
+        self.assertNotIn(
+            'helper=$(python tools/get_file_in_pkg _init_helper.py', workflow
+        )
+        self.assertIn('dependency-wheelhouse/mkl-service', workflow)
+        self.assertIn('dependency-wheelhouse/numpy', workflow)
 
     def test_numpy_runs_full_upstream_suite_after_ilp64_assertions(self):
         tests = (TOOLS / 'numpy_tests.py').read_text()
 
-        self.assertIn("assert HAS_LAPACK64", tests)
+        self.assertNotIn('assert HAS_LAPACK64', tests)
+        self.assertIn('HAS_LAPACK64 is expect_ilp64', tests)
+        self.assertNotIn('add_dll_directory', tests)
         self.assertIn("label='full'", tests)
         self.assertIn("'--timeout=1800'", tests)
         self.assertNotIn("'-k'", tests)
@@ -187,6 +233,48 @@ class TestWorkflowContracts(unittest.TestCase):
         self.assertNotIn('Rebuild scipy', workflow)
         self.assertNotIn('Rebuild mkl-service', workflow)
         self.assertTrue(pins.rstrip().endswith('{}'))
+
+    def test_regression_suite_is_wired_into_preflight(self):
+        coordinator = self.workflow('package_set.yml')
+
+        self.assertIn('tools/test_branch_fixes.py', coordinator)
+        self.assertIn('ruff==0.14.6 format --check', coordinator)
+
+    def test_scipy_license_and_locked_pkgconf_are_preserved(self):
+        workflow = self.workflow('wheels.yml')
+
+        self.assertIn('cat LICENSES_bundled.txt >>LICENSE.txt', workflow)
+        self.assertNotIn('choco install', workflow)
+        self.assertIn('pkgconf.get_executable()', workflow)
+
+    def test_recipe_includes_package_set_certification_inputs(self):
+        required = {
+            '.github/workflows/package_set.yml',
+            '.github/workflows/verify_package_set.yml',
+            'tools/package_set_plan.py',
+            'tools/verify_package_set.py',
+        }
+
+        self.assertTrue(required.issubset(build_recipe.COMMON_FILES))
+
+    def test_platform_policy_is_carried_by_matrix(self):
+        config = yaml.safe_load((ROOT / 'ci-targets.yaml').read_text())
+
+        for runner in config['defaults']['runners']:
+            self.assertIsInstance(runner, dict)
+            self.assertIn(runner['os'], {'Linux', 'Windows'})
+            self.assertTrue(runner['numpy_ilp64'])
+            self.assertIn('scipy_ilp64', runner)
+
+    def test_platform_policy_rejects_unknown_os(self):
+        fetch_matrix = runpy.run_path(str(TOOLS / 'fetch_matrix2'))
+        config = yaml.safe_load((ROOT / 'ci-targets.yaml').read_text())
+        config['defaults']['runners'][0]['os'] = 'Plan9'
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / 'targets.yaml'
+            path.write_text(yaml.safe_dump(config))
+            with self.assertRaisesRegex(ValueError, 'Unknown runner policy OS'):
+                fetch_matrix['Config']('numpy', path)
 
     def test_operational_paths_do_not_point_to_upstream_fork(self):
         paths = (
@@ -225,6 +313,66 @@ class TestPackageSetIdentity(unittest.TestCase):
         self.assertEqual(identity.version, '2.8.0')
 
 
+class TestPackageSetPlan(unittest.TestCase):
+    @staticmethod
+    def package(name, full_versions, stale_versions=()):
+        def matrix(versions):
+            include = [
+                {
+                    'runner': 'ubuntu-latest',
+                    'python_version': version,
+                    'container': 'manylinux',
+                    'os': 'Linux',
+                    'numpy_ilp64': True,
+                    'scipy_ilp64': True,
+                }
+                for version in versions
+            ]
+            return {'include': include} if include else None
+
+        return {
+            'name': name,
+            'version': '1.0',
+            'tag': 'v1.0',
+            'matrix': matrix(stale_versions),
+            'full_matrix': matrix(full_versions),
+        }
+
+    def test_uses_common_coordinates_not_scipy_matrix(self):
+        plan = package_set_plan.build_plan(
+            {
+                'mkl-service': self.package(
+                    'mkl-service', ('cp311', 'cp312', 'cp313'), ('cp311',)
+                ),
+                'numpy': self.package('numpy', ('cp312', 'cp313'), ('cp312',)),
+                'scipy': self.package('scipy', ('cp312', 'cp313'), ('cp313',)),
+            }
+        )
+
+        self.assertEqual(
+            [entry['python_version'] for entry in plan['matrix']['include']],
+            ['cp312', 'cp313'],
+        )
+
+    def test_fully_cached_set_is_noop(self):
+        packages = {
+            name: self.package(name, ('cp312',))
+            for name in ('mkl-service', 'numpy', 'scipy')
+        }
+
+        self.assertIsNone(package_set_plan.build_plan(packages)['matrix'])
+
+    def test_force_rebuilds_full_common_set(self):
+        packages = {
+            name: self.package(name, ('cp312', 'cp313'))
+            for name in ('mkl-service', 'numpy', 'scipy')
+        }
+
+        plan = package_set_plan.build_plan(packages, force=True)
+
+        self.assertEqual(len(plan['matrix']['include']), 2)
+
+
 class TestNixResolutionBoundary(unittest.TestCase):
     @staticmethod
     def package(name, url):
@@ -253,7 +401,9 @@ class TestNixResolutionBoundary(unittest.TestCase):
             return ''
 
         resolution.run = write_lock
-        with patch.object(updater['tomllib'], 'loads', return_value={'packages': packages}):
+        with patch.object(
+            updater['tomllib'], 'loads', return_value={'packages': packages}
+        ):
             return resolution.fetch_wheels(), updater['ResolutionError']
 
     def test_rejects_incomplete_fork_package_set(self):
@@ -264,7 +414,9 @@ class TestNixResolutionBoundary(unittest.TestCase):
         fork = 'https://github.com/michael-denyer/numpy-mkl/releases/download/1/'
         packages = [
             self.package('mkl-service', fork + 'mkl_service.whl'),
-            self.package('numpy', 'https://github.com/other/repo/releases/download/numpy.whl'),
+            self.package(
+                'numpy', 'https://github.com/other/repo/releases/download/numpy.whl'
+            ),
             self.package('scipy', fork + 'scipy.whl'),
         ]
 

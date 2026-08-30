@@ -35,7 +35,7 @@ automatically installed by the package manager.
 pip install numpy scipy --index-url https://michael-denyer.github.io/numpy-mkl
 
 # uv
-uv add numpy --index https://michael-denyer.github.io/numpy-mkl
+uv add numpy scipy --index https://michael-denyer.github.io/numpy-mkl
 ```
 
 ## Platform Support

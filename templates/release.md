@@ -13,7 +13,7 @@ It is recommended to use `uv` or `pip` to automatically handle all dependencies.
 ```sh
 # Run this from project directory
 uv init
-uv add numpy --index {index_url}
+uv add numpy scipy --index {index_url}
 ```
 
 **pip**

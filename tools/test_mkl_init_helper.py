@@ -18,6 +18,7 @@ LINUX_NAMES = (
     'libmkl_intel_lp64.so.3',
     'libmkl_intel_ilp64.so.3',
 )
+WINDOWS_NAMES = ('mkl_rt.3.dll', 'mkl_intel_ilp64.3.dll')
 
 
 class PackageFile:
@@ -64,7 +65,10 @@ class TestMklRuntimeInitialization(unittest.TestCase):
         mode = os.RTLD_LAZY | ctypes.RTLD_GLOBAL
         self.assertEqual(
             cdll.call_args_list,
-            [call((self.runtime_dir / name).resolve(), mode=mode) for name in LINUX_NAMES],
+            [
+                call((self.runtime_dir / name).resolve(), mode=mode)
+                for name in LINUX_NAMES
+            ],
         )
         self.assertEqual(namespace['_runtime_handle'], tuple(handles))
 
@@ -85,7 +89,8 @@ class TestMklRuntimeInitialization(unittest.TestCase):
         distribution_files.return_value = self.runtime_files(LINUX_NAMES[:-1])
 
         with self.assertRaisesRegex(
-            ImportError, "missing ILP64 interface library matching '\\*libmkl_intel_ilp64"
+            ImportError,
+            "missing ILP64 interface library matching '\\*libmkl_intel_ilp64",
         ):
             runpy.run_path(str(HELPER))
 
@@ -105,17 +110,20 @@ class TestMklRuntimeInitialization(unittest.TestCase):
         cdll.side_effect = OSError('wrong ELF class')
 
         with self.assertRaisesRegex(
-            ImportError, "failed to load dispatcher library '.*libmkl_rt.so.3': wrong ELF"
+            ImportError,
+            "failed to load dispatcher library '.*libmkl_rt.so.3': wrong ELF",
         ):
             runpy.run_path(str(HELPER))
 
     @patch('importlib.metadata.files')
     def test_windows_retains_dll_directory_handle(self, distribution_files):
-        distribution_files.return_value = self.runtime_files(('mkl_rt.3.dll',))
+        distribution_files.return_value = self.runtime_files(WINDOWS_NAMES)
         handle = object()
         with (
             patch.object(os, 'name', 'nt'),
-            patch.object(os, 'add_dll_directory', return_value=handle, create=True) as add,
+            patch.object(
+                os, 'add_dll_directory', return_value=handle, create=True
+            ) as add,
         ):
             namespace = runpy.run_path(str(HELPER))
 
@@ -136,8 +144,21 @@ class TestMklRuntimeInitialization(unittest.TestCase):
             runpy.run_path(str(HELPER))
 
     @patch('importlib.metadata.files')
-    def test_windows_loader_error_names_dll_directory(self, distribution_files):
+    def test_windows_requires_ilp64_interface(self, distribution_files):
         distribution_files.return_value = self.runtime_files(('mkl_rt.3.dll',))
+        with (
+            patch.object(os, 'name', 'nt'),
+            patch.object(os, 'add_dll_directory', create=True),
+            self.assertRaisesRegex(
+                ImportError,
+                "missing ILP64 interface library matching '\\*mkl_intel_ilp64",
+            ),
+        ):
+            runpy.run_path(str(HELPER))
+
+    @patch('importlib.metadata.files')
+    def test_windows_loader_error_names_dll_directory(self, distribution_files):
+        distribution_files.return_value = self.runtime_files(WINDOWS_NAMES)
         with (
             patch.object(os, 'name', 'nt'),
             patch.object(
@@ -146,7 +167,9 @@ class TestMklRuntimeInitialization(unittest.TestCase):
                 side_effect=OSError('access denied'),
                 create=True,
             ),
-            self.assertRaisesRegex(ImportError, 'failed to register DLL directory.*access denied'),
+            self.assertRaisesRegex(
+                ImportError, 'failed to register DLL directory.*access denied'
+            ),
         ):
             runpy.run_path(str(HELPER))
 

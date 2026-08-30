@@ -2,42 +2,25 @@ name: Build wheels
 
 on:
   workflow_dispatch:
+  pull_request:
   schedule:
     - cron: "15 22 * * 0" # 22.15 UTC every Sunday
 
-permissions:
-  contents: write
-
 jobs:
-  # Refresh the mirrored PyPI links before building, so that wheels are resolved and
-  # tested against an index that carries the latest MKL runtime they pin.
-  links:
-    uses: ./.github/workflows/links.yml
-
-  mkl-service:
-    uses: ./.github/workflows/wheels.yml
+  verify:
+    if: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/package_set.yml
     with:
-      name: mkl-service
-      repo: IntelPython/mkl-service
-    needs: links
+      force-build: true
+      publish: false
 
-  numpy:
-    uses: ./.github/workflows/wheels.yml
+  publish:
+    if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+    permissions:
+      contents: write
+    uses: ./.github/workflows/package_set.yml
     with:
-      name: numpy
-      repo: numpy/numpy
-    needs: [links, mkl-service]
-
-  scipy:
-    uses: ./.github/workflows/wheels.yml
-    with:
-      name: scipy
-      repo: scipy/scipy
-    needs: [links, mkl-service, numpy]
-
-  verify-package-set:
-    if: ${{ github.ref != 'refs/heads/main' && needs.scipy.outputs.matrix != 'null' }}
-    uses: ./.github/workflows/verify_package_set.yml
-    with:
-      matrix: ${{ needs.scipy.outputs.matrix }}
-    needs: [mkl-service, numpy, scipy]
+      force-build: false
+      publish: true

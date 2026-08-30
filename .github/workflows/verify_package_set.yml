@@ -55,6 +55,10 @@ jobs:
           path: artifacts/scipy
 
       - name: Install and verify exact same-run wheels
+        env:
+          EXPECT_NUMPY_ILP64: ${{ matrix.numpy_ilp64 }}
+          EXPECT_SCIPY_ILP64: ${{ matrix.scipy_ilp64 }}
+          POLICY_RUNNER_OS: ${{ matrix.os }}
         run: |
           shopt -s nullglob
           mkl_service_wheels=(artifacts/mkl-service/*.whl)
@@ -88,4 +92,5 @@ jobs:
           python tools/verify_package_set.py \
             --mkl-service "${mkl_service_wheels[0]}" \
             --numpy "${numpy_wheels[0]}" \
-            --scipy "${scipy_wheels[0]}"
+            --scipy "${scipy_wheels[0]}" \
+            --runner-os "$POLICY_RUNNER_OS"

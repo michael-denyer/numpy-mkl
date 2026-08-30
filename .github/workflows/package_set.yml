@@ -1,0 +1,231 @@
+name: Package set
+
+on:
+  workflow_call:
+    inputs:
+      force-build:
+        required: false
+        type: boolean
+        default: false
+        description: "Build every common coordinate regardless of stored state"
+      publish:
+        required: true
+        type: boolean
+        description: "Publish after exact package-set verification"
+
+env:
+  PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version-file: "pyproject.toml"
+      - name: Run branch regression tests
+        run: uv run --locked python -m unittest tools/test_branch_fixes.py tools/test_mkl_init_helper.py
+      - name: Check Python formatting and lint
+        run: |
+          uvx ruff==0.14.6 format --check tools patches/mkl-service/_init_helper.py
+          uvx ruff==0.14.6 check tools patches/mkl-service/_init_helper.py
+
+  links:
+    if: ${{ inputs.publish && github.ref == 'refs/heads/main' }}
+    needs: preflight
+    permissions:
+      contents: write
+    uses: ./.github/workflows/links.yml
+
+  plan:
+    if: ${{ always() && needs.preflight.result == 'success' && (needs.links.result == 'success' || needs.links.result == 'skipped') }}
+    needs: [preflight, links]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      mkl_service_tag: ${{ steps.plan.outputs.mkl_service_tag }}
+      mkl_service_version: ${{ steps.plan.outputs.mkl_service_version }}
+      numpy_tag: ${{ steps.plan.outputs.numpy_tag }}
+      numpy_version: ${{ steps.plan.outputs.numpy_version }}
+      scipy_tag: ${{ steps.plan.outputs.scipy_tag }}
+      scipy_version: ${{ steps.plan.outputs.scipy_version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version-file: "pyproject.toml"
+      - name: Plan common package set
+        id: plan
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORCE_BUILD: ${{ inputs.force-build || github.ref != 'refs/heads/main' }}
+        run: |
+          for package in mkl-service numpy scipy; do
+            uv run --locked tools/fetch_matrix2 "$package" \
+              --config ci-targets.yaml --store build.json --token "$GH_TOKEN" \
+              >"$package.json"
+          done
+
+          force_args=()
+          [[ "$FORCE_BUILD" == "true" ]] && force_args+=(--force)
+          uv run --locked tools/package_set_plan.py \
+            --mkl-service mkl-service.json --numpy numpy.json --scipy scipy.json \
+            "${force_args[@]}" >plan.json
+          yq -P -o yaml plan.json
+
+          echo "matrix=$(jq -c '.matrix' plan.json)" >>"$GITHUB_OUTPUT"
+          for package in mkl-service numpy scipy; do
+            output_name=${package//-/_}
+            echo "${output_name}_tag=$(jq -r ".packages[\"$package\"].tag" plan.json)" \
+              >>"$GITHUB_OUTPUT"
+            echo "${output_name}_version=$(jq -r ".packages[\"$package\"].version" plan.json)" \
+              >>"$GITHUB_OUTPUT"
+          done
+
+  mkl-service:
+    if: ${{ needs.plan.outputs.matrix != 'null' }}
+    needs: plan
+    permissions:
+      contents: read
+    uses: ./.github/workflows/wheels.yml
+    with:
+      name: mkl-service
+      repo: IntelPython/mkl-service
+      matrix: ${{ needs.plan.outputs.matrix }}
+      tag: ${{ needs.plan.outputs.mkl_service_tag }}
+      version: ${{ needs.plan.outputs.mkl_service_version }}
+
+  numpy:
+    if: ${{ needs.plan.outputs.matrix != 'null' }}
+    needs: [plan, mkl-service]
+    permissions:
+      contents: read
+    uses: ./.github/workflows/wheels.yml
+    with:
+      name: numpy
+      repo: numpy/numpy
+      matrix: ${{ needs.plan.outputs.matrix }}
+      tag: ${{ needs.plan.outputs.numpy_tag }}
+      version: ${{ needs.plan.outputs.numpy_version }}
+
+  scipy:
+    if: ${{ needs.plan.outputs.matrix != 'null' }}
+    needs: [plan, mkl-service, numpy]
+    permissions:
+      contents: read
+    uses: ./.github/workflows/wheels.yml
+    with:
+      name: scipy
+      repo: scipy/scipy
+      matrix: ${{ needs.plan.outputs.matrix }}
+      tag: ${{ needs.plan.outputs.scipy_tag }}
+      version: ${{ needs.plan.outputs.scipy_version }}
+
+  verify-package-set:
+    if: ${{ needs.plan.outputs.matrix != 'null' }}
+    needs: [plan, mkl-service, numpy, scipy]
+    permissions:
+      contents: read
+    uses: ./.github/workflows/verify_package_set.yml
+    with:
+      matrix: ${{ needs.plan.outputs.matrix }}
+
+  release:
+    if: ${{ inputs.publish && github.ref == 'refs/heads/main' && needs.plan.outputs.matrix != 'null' }}
+    needs: [plan, verify-package-set]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: package-set-publication
+      cancel-in-progress: false
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Checkout deployment branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: pypi
+          path: pypi
+          persist-credentials: true
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          version-file: "pyproject.toml"
+      - name: Fetch mkl-service wheels
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: mkl-service-*
+          path: release
+          merge-multiple: true
+      - name: Fetch NumPy wheels
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: numpy-*
+          path: release
+          merge-multiple: true
+      - name: Fetch SciPy wheels
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: scipy-*
+          path: release
+          merge-multiple: true
+      - name: Validate and stage verified release
+        env:
+          MATRIX: ${{ needs.plan.outputs.matrix }}
+        run: |
+          expected=$(( $(jq '.include | length' <<<"$MATRIX") * 3 ))
+          mapfile -t wheels < <(find release -maxdepth 1 -name '*.whl' -print)
+          mapfile -t metadata < <(find release -maxdepth 1 -name '*.json' -print)
+          [[ ${#wheels[@]} -eq $expected ]] || {
+            echo "::error::Expected $expected verified wheels, found ${#wheels[@]}"
+            exit 1
+          }
+          [[ ${#metadata[@]} -eq $expected ]] || {
+            echo "::error::Expected $expected build records, found ${#metadata[@]}"
+            exit 1
+          }
+          uv run --locked tools/store_info.py "${metadata[@]}" --store build.json
+          uv version --bump patch
+          echo "VERSION=$(uv version --short)" >>"$GITHUB_ENV"
+          uv run --locked tools/release_notes templates/release.md \
+            --store build.json --index-url "$PAGES_URL" >release/release.md
+      - name: Release verified wheel set
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$VERSION" --title "$VERSION" \
+            --notes-file release/release.md release/*.whl
+      - name: Generate package indexes
+        run: |
+          sleep 10
+          for package in mkl-service numpy scipy; do
+            uv run --locked tools/make_index2 "pypi/$package/index.html" \
+              --repository "$GITHUB_REPOSITORY" --token ${{ secrets.GITHUB_TOKEN }}
+          done
+      - name: Deploy complete package set index
+        working-directory: pypi
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add mkl-service/index.html numpy/index.html scipy/index.html
+          git commit -m "ci: Add verified wheel set ${VERSION}"
+          git push origin HEAD:pypi
+      - name: Record verified package set
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add build.json pyproject.toml uv.lock
+          git commit -m "ci: Prepare verified wheel set ${VERSION}"
+          git push origin HEAD:main

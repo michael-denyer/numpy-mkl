@@ -13,7 +13,10 @@ import os
 from importlib.metadata import PackageNotFoundError, files
 
 MKL_DISTRIBUTION = 'mkl'
-WINDOWS_RUNTIME = (('dispatcher', '*mkl_rt*.dll'),)
+WINDOWS_RUNTIMES = (
+    ('dispatcher', '*mkl_rt*.dll'),
+    ('ILP64 interface', '*mkl_intel_ilp64*.dll'),
+)
 LINUX_RUNTIMES = (
     ('dispatcher', '*libmkl_rt.so*'),
     ('core', '*libmkl_core.so*'),
@@ -63,13 +66,20 @@ def _required_files(installed_files, required, distribution=MKL_DISTRIBUTION):
 
 
 def _initialize_windows(installed_files):
-    _, runtime = _required_files(installed_files, WINDOWS_RUNTIME)[0]
+    runtimes = _required_files(installed_files, WINDOWS_RUNTIMES)
+    runtime_directories = {runtime.parent for _, runtime in runtimes}
+    if len(runtime_directories) != 1:
+        raise ImportError(
+            f"Cannot initialize MKL runtime from distribution '{MKL_DISTRIBUTION}': "
+            f'required DLLs span multiple directories: {sorted(map(str, runtime_directories))}'
+        )
+    runtime_directory = runtime_directories.pop()
     try:
-        return os.add_dll_directory(runtime.parent)
+        return os.add_dll_directory(runtime_directory)
     except OSError as e:
         raise ImportError(
             f"Cannot initialize MKL runtime from distribution '{MKL_DISTRIBUTION}': "
-            f"failed to register DLL directory '{runtime.parent}': {e}"
+            f"failed to register DLL directory '{runtime_directory}': {e}"
         ) from e
 
 
@@ -94,7 +104,9 @@ def initialize_mkl_runtime(platform=None):
         return _initialize_windows(installed_files)
     if platform == 'posix':
         return _initialize_linux(installed_files)
-    raise ImportError(f"MKL runtime initialization does not support platform '{platform}'")
+    raise ImportError(
+        f"MKL runtime initialization does not support platform '{platform}'"
+    )
 
 
 # The returned DLL-directory or CDLL handles must live as long as the process.

@@ -5,14 +5,19 @@ import hashlib
 from pathlib import Path
 
 COMMON_FILES = (
+    '.github/workflows/package_set.yml',
+    '.github/workflows/verify_package_set.yml',
     '.github/workflows/wheels.yml',
     'ci-targets.yaml',
+    'patches/LICENSE_MKL.txt',
     'pyproject.toml',
     'uv.lock',
     'tools/build_recipe.py',
     'tools/fetch_matrix2',
     'tools/get_file_in_pkg',
+    'tools/package_set_plan.py',
     'tools/store_info.py',
+    'tools/verify_package_set.py',
 )
 
 PACKAGE_FILES = {
