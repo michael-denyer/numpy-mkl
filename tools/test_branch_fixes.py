@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import json
 import runpy
 import sys
 import tempfile
@@ -18,6 +19,7 @@ sys.path.insert(0, str(TOOLS))
 import build_recipe  # noqa: E402
 import package_set_plan  # noqa: E402
 import verify_package_set  # noqa: E402
+import write_build_info  # noqa: E402
 from store_info import Build  # noqa: E402
 
 RECIPE = f'sha256:{"a" * 64}'
@@ -131,6 +133,23 @@ class TestBuildIdentity(unittest.TestCase):
         self.assertEqual(before['mkl-service'], after['mkl-service'])
         self.assertEqual(before['scipy'], after['scipy'])
 
+    def test_build_information_writer_records_current_recipe(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output = Path(temporary_directory) / 'build.json'
+            build = write_build_info.write_build_info(
+                {
+                    'name': 'numpy',
+                    'version': '2.5.2',
+                    'python': 'cp312',
+                    'os': 'Linux',
+                    'mkl': '2026.1.0',
+                },
+                output,
+            )
+
+            self.assertEqual(json.loads(output.read_text()), build)
+            self.assertRegex(build['recipe'], r'^sha256:[0-9a-f]{64}$')
+
 
 class TestWorkflowContracts(unittest.TestCase):
     def workflow(self, name):
@@ -228,6 +247,12 @@ class TestWorkflowContracts(unittest.TestCase):
         self.assertIn(
             'versions-${PACKAGE_NAME}-${PYTHON_TAG}-${RUNNER_OS}.json', workflow
         )
+
+    def test_build_information_does_not_depend_on_runner_jq(self):
+        workflow = self.workflow('wheels.yml')
+
+        self.assertNotIn('jq -n', workflow)
+        self.assertIn('tools/write_build_info.py', workflow)
 
     def test_tests_do_not_hot_copy_source_into_installed_package(self):
         workflow = self.workflow('wheels.yml')

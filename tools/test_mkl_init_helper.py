@@ -8,6 +8,7 @@ import unittest
 from contextlib import contextmanager
 from importlib.metadata import PackageNotFoundError
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import call, patch
 
 HELPER = Path(__file__).parents[1] / 'patches/mkl-service/_init_helper.py'
@@ -19,7 +20,7 @@ LINUX_NAMES = (
     'libmkl_intel_lp64.so.3',
     'libmkl_intel_ilp64.so.3',
 )
-WINDOWS_NAMES = ('mkl_rt.3.dll', 'mkl_intel_ilp64.3.dll')
+WINDOWS_NAMES = ('mkl_rt.3.dll',)
 
 
 @contextmanager
@@ -139,17 +140,27 @@ class TestMklRuntimeInitialization(unittest.TestCase):
     @patch('importlib.metadata.files')
     def test_windows_retains_dll_directory_handle(self, distribution_files):
         distribution_files.return_value = self.runtime_files(WINDOWS_NAMES)
-        handle = object()
+        directory_handle = object()
+        runtime_handle = SimpleNamespace(DGEMM_64=object(), DGESV_64=object())
         with (
             patch.object(os, 'name', 'nt'),
             patch.object(
-                os, 'add_dll_directory', return_value=handle, create=True
+                os,
+                'add_dll_directory',
+                return_value=directory_handle,
+                create=True,
             ) as add,
+            patch.object(
+                ctypes, 'WinDLL', return_value=runtime_handle, create=True
+            ) as load,
         ):
             namespace = runpy.run_path(str(HELPER))
 
         add.assert_called_once_with(self.runtime_dir.resolve())
-        self.assertIs(namespace['_runtime_handle'], handle)
+        load.assert_called_once_with((self.runtime_dir / WINDOWS_NAMES[0]).resolve())
+        self.assertEqual(
+            namespace['_runtime_handle'], (directory_handle, runtime_handle)
+        )
 
     @patch('importlib.metadata.files', return_value=[])
     def test_windows_missing_runtime_is_contextual_import_error(
@@ -165,14 +176,20 @@ class TestMklRuntimeInitialization(unittest.TestCase):
             runpy.run_path(str(HELPER))
 
     @patch('importlib.metadata.files')
-    def test_windows_requires_ilp64_interface(self, distribution_files):
+    def test_windows_requires_ilp64_exports(self, distribution_files):
         distribution_files.return_value = self.runtime_files(('mkl_rt.3.dll',))
         with (
             patch.object(os, 'name', 'nt'),
             patch.object(os, 'add_dll_directory', create=True),
+            patch.object(
+                ctypes,
+                'WinDLL',
+                return_value=SimpleNamespace(DGEMM_64=object()),
+                create=True,
+            ),
             self.assertRaisesRegex(
                 ImportError,
-                "missing ILP64 interface library matching '\\*mkl_intel_ilp64",
+                "dispatcher.*missing ILP64 export 'DGESV_64'",
             ),
         ):
             runpy.run_path(str(HELPER))

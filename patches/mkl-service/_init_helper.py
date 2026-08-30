@@ -13,10 +13,8 @@ import os
 from importlib.metadata import PackageNotFoundError, files
 
 MKL_DISTRIBUTION = 'mkl'
-WINDOWS_RUNTIMES = (
-    ('dispatcher', '*mkl_rt*.dll'),
-    ('ILP64 interface', '*mkl_intel_ilp64*.dll'),
-)
+WINDOWS_RUNTIMES = (('dispatcher', '*mkl_rt*.dll'),)
+WINDOWS_ILP64_EXPORTS = ('DGEMM_64', 'DGESV_64')
 LINUX_RUNTIMES = (
     ('dispatcher', '*libmkl_rt.so*'),
     ('core', '*libmkl_core.so*'),
@@ -75,12 +73,32 @@ def _initialize_windows(installed_files):
         )
     runtime_directory = runtime_directories.pop()
     try:
-        return os.add_dll_directory(runtime_directory)
+        directory_handle = os.add_dll_directory(runtime_directory)
     except OSError as e:
         raise ImportError(
             f"Cannot initialize MKL runtime from distribution '{MKL_DISTRIBUTION}': "
             f"failed to register DLL directory '{runtime_directory}': {e}"
         ) from e
+
+    _, dispatcher = runtimes[0]
+    try:
+        runtime_handle = ctypes.WinDLL(dispatcher)
+    except OSError as e:
+        raise ImportError(
+            f"Cannot initialize MKL runtime from distribution '{MKL_DISTRIBUTION}': "
+            f"failed to load dispatcher library '{dispatcher}': {e}"
+        ) from e
+
+    for symbol in WINDOWS_ILP64_EXPORTS:
+        try:
+            getattr(runtime_handle, symbol)
+        except AttributeError as e:
+            raise ImportError(
+                f'Cannot initialize MKL runtime from distribution '
+                f"'{MKL_DISTRIBUTION}': dispatcher library '{dispatcher}' is "
+                f"missing ILP64 export '{symbol}'"
+            ) from e
+    return directory_handle, runtime_handle
 
 
 def _initialize_linux(installed_files):

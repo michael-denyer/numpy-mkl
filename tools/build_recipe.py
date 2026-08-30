@@ -18,6 +18,7 @@ COMMON_FILES = (
     'tools/package_set_plan.py',
     'tools/store_info.py',
     'tools/verify_package_set.py',
+    'tools/write_build_info.py',
 )
 
 PACKAGE_FILES = {

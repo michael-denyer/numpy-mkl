@@ -400,17 +400,12 @@ jobs:
 
       - name: Store build information
         run: |
-          RECIPE_HASH=$(uv run --locked tools/build_recipe.py "$PACKAGE_NAME")
-          jq -n \
-            --arg name "$PACKAGE_NAME" \
-            --arg version "$PACKAGE_VERSION" \
-            --arg python "$PYTHON_TAG" \
-            --arg os "$RUNNER_OS" \
-            --arg mkl "$MKL_VERSION" \
-            --arg recipe "$RECIPE_HASH" \
-            '{name: $name, version: $version, python: $python, os: $os,
-              mkl: $mkl, recipe: $recipe}' \
-            >"wheelhouse/versions-${PACKAGE_NAME}-${PYTHON_TAG}-${RUNNER_OS}.json"
+          uv run --locked python tools/write_build_info.py "$PACKAGE_NAME" \
+            --version "$PACKAGE_VERSION" \
+            --python "$PYTHON_TAG" \
+            --os "$RUNNER_OS" \
+            --mkl "$MKL_VERSION" \
+            --output "wheelhouse/versions-${PACKAGE_NAME}-${PYTHON_TAG}-${RUNNER_OS}.json"
 
       - name: Archive
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
