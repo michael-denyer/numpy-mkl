@@ -5,6 +5,7 @@ import os
 import runpy
 import tempfile
 import unittest
+from contextlib import contextmanager
 from importlib.metadata import PackageNotFoundError
 from pathlib import Path
 from unittest.mock import call, patch
@@ -19,6 +20,16 @@ LINUX_NAMES = (
     'libmkl_intel_ilp64.so.3',
 )
 WINDOWS_NAMES = ('mkl_rt.3.dll', 'mkl_intel_ilp64.3.dll')
+
+
+@contextmanager
+def linux_platform():
+    with (
+        patch.object(os, 'name', 'posix'),
+        patch.object(os, 'RTLD_LAZY', 1, create=True),
+        patch.object(ctypes, 'RTLD_GLOBAL', 256, create=True),
+    ):
+        yield
 
 
 class PackageFile:
@@ -60,9 +71,10 @@ class TestMklRuntimeInitialization(unittest.TestCase):
         handles = [object() for _ in LINUX_NAMES]
         cdll.side_effect = handles
 
-        namespace = runpy.run_path(str(HELPER))
+        with linux_platform():
+            namespace = runpy.run_path(str(HELPER))
 
-        mode = os.RTLD_LAZY | ctypes.RTLD_GLOBAL
+        mode = 1 | 256
         self.assertEqual(
             cdll.call_args_list,
             [
@@ -88,9 +100,12 @@ class TestMklRuntimeInitialization(unittest.TestCase):
     def test_missing_required_library_names_role_and_pattern(self, distribution_files):
         distribution_files.return_value = self.runtime_files(LINUX_NAMES[:-1])
 
-        with self.assertRaisesRegex(
-            ImportError,
-            "missing ILP64 interface library matching '\\*libmkl_intel_ilp64",
+        with (
+            linux_platform(),
+            self.assertRaisesRegex(
+                ImportError,
+                "missing ILP64 interface library matching '\\*libmkl_intel_ilp64",
+            ),
         ):
             runpy.run_path(str(HELPER))
 
@@ -100,7 +115,10 @@ class TestMklRuntimeInitialization(unittest.TestCase):
         installed_files[-1].path.unlink()
         distribution_files.return_value = installed_files
 
-        with self.assertRaisesRegex(ImportError, 'is not an installed file'):
+        with (
+            linux_platform(),
+            self.assertRaisesRegex(ImportError, 'is not an installed file'),
+        ):
             runpy.run_path(str(HELPER))
 
     @patch('importlib.metadata.files')
@@ -109,9 +127,12 @@ class TestMklRuntimeInitialization(unittest.TestCase):
         distribution_files.return_value = self.runtime_files()
         cdll.side_effect = OSError('wrong ELF class')
 
-        with self.assertRaisesRegex(
-            ImportError,
-            "failed to load dispatcher library '.*libmkl_rt.so.3': wrong ELF",
+        with (
+            linux_platform(),
+            self.assertRaisesRegex(
+                ImportError,
+                "failed to load dispatcher library '.*libmkl_rt.so.3': wrong ELF",
+            ),
         ):
             runpy.run_path(str(HELPER))
 
