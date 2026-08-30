@@ -18,16 +18,18 @@ import csv
 import hashlib
 import io
 import json
+import os
 import re
-import shutil
 import subprocess
 import tempfile
 import zipfile
 from pathlib import Path
 
 
-def get_releases(token=None):
-    cmd = ['gh', 'api', 'repos/urob/numpy-mkl/releases', '--paginate']
+def get_releases(repository, token=None):
+    if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', repository):
+        raise ValueError(f'Invalid GitHub repository {repository!r}')
+    cmd = ['gh', 'api', f'repos/{repository}/releases', '--paginate']
     if token:
         cmd += ['--header', f'Authorization: Bearer {token}']
     result = subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -126,11 +128,16 @@ def main():
     parser.add_argument('--version', metavar='PREFIX',
                         help='Only patch wheels whose version starts with PREFIX (e.g. 2.4)')
     parser.add_argument('--token', help='GitHub token for authentication')
+    parser.add_argument(
+        '--repository',
+        default=os.environ.get('GITHUB_REPOSITORY', 'michael-denyer/numpy-mkl'),
+        help='GitHub owner/repository containing the wheel releases',
+    )
     args = parser.parse_args()
 
     packages = {p.replace('-', '_') for p in args.packages}
 
-    releases = get_releases(args.token)
+    releases = get_releases(args.repository, args.token)
     needs_reindex: set[str] = set()
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -159,7 +166,18 @@ def main():
                 dst = patched_dir / name
 
                 subprocess.run(
-                    ['gh', 'release', 'download', tag, '--pattern', name, '-D', str(tmp)],
+                    [
+                        'gh',
+                        'release',
+                        'download',
+                        tag,
+                        '--repo',
+                        args.repository,
+                        '--pattern',
+                        name,
+                        '-D',
+                        str(tmp),
+                    ],
                     check=True, capture_output=True,
                 )
 
@@ -194,6 +212,7 @@ def main():
         )
         subprocess.run(
             ['gh', 'release', 'create', args.release_tag,
+             '--repo', args.repository,
              '--title', args.release_tag,
              *notes_args,
              *[str(w) for w in patched_wheels]],
@@ -203,7 +222,10 @@ def main():
 
         print('\nAll wheels uploaded. Regenerate the index with:')
         for pkg in sorted(needs_reindex):
-            print(f'  uv run tools/make_index2 pypi/{pkg}/index.html --token <TOKEN>')
+            print(
+                f'  uv run tools/make_index2 pypi/{pkg}/index.html '
+                f'--repository {args.repository} --token <TOKEN>'
+            )
 
 
 if __name__ == '__main__':

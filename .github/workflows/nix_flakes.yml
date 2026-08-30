@@ -6,9 +6,6 @@ on:
     workflows:
       - Build wheels
       - Rebuild all
-      - Rebuild mkl-service
-      - Rebuild numpy
-      - Rebuild scipy
     types: [completed]
 
 permissions:
@@ -16,7 +13,11 @@ permissions:
 
 jobs:
   nix:
-    if: github.repository == 'urob/numpy-mkl'
+    if: >-
+      github.repository == 'michael-denyer/numpy-mkl' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'))
     runs-on: ubuntu-latest
     timeout-minutes: 45
 

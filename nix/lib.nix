@@ -36,6 +36,6 @@ rec {
       throw ''
         numpy-mkl has no ${pname} wheel for ${python.executable} (python ${pythonVersion}).
         This overlay provides x86_64-linux CPython wheels for python ${lib.concatStringsSep ", " supportedPythons}.
-        See https://github.com/urob/numpy-mkl for the supported versions.
+        See https://github.com/michael-denyer/numpy-mkl for the supported versions.
       '';
 }

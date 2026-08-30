@@ -34,3 +34,10 @@ jobs:
       name: scipy
       repo: scipy/scipy
     needs: [links, mkl-service, numpy]
+
+  verify-package-set:
+    if: ${{ github.ref != 'refs/heads/main' && needs.scipy.outputs.matrix != 'null' }}
+    uses: ./.github/workflows/verify_package_set.yml
+    with:
+      matrix: ${{ needs.scipy.outputs.matrix }}
+    needs: [mkl-service, numpy, scipy]

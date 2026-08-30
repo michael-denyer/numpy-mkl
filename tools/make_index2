@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import argparse
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -83,9 +84,11 @@ class ParseIndex:
 
 
 class Wheels:
-    def __init__(self, package):
+    def __init__(self, package, repository):
         self.package = package.replace('-', '_')
-        self.url = 'https://api.github.com/repos/michael-denyer/numpy-mkl/releases'
+        if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', repository):
+            raise ValueError(f'Invalid GitHub repository {repository!r}')
+        self.url = f'https://api.github.com/repos/{repository}/releases'
 
     def fetch_releases(self, token=None):
         headers = self.headers(token=token)
@@ -113,10 +116,13 @@ class Wheels:
             if release['draft']:
                 continue
             for a in release['assets']:
-                if a['name'].startswith(self.package) and a['name'].endswith('.whl'):
-                    if a['name'] not in seen:
-                        seen.add(a['name'])
-                        wheels.append(Wheel(a))
+                if (
+                    a['name'].startswith(self.package)
+                    and a['name'].endswith('.whl')
+                    and a['name'] not in seen
+                ):
+                    seen.add(a['name'])
+                    wheels.append(Wheel(a))
         return sorted(wheels, key=lambda w: w.name)
 
 
@@ -130,14 +136,21 @@ if __name__ == '__main__':
     parser.add_argument('indexfile', type=str, help='path to index')
     parser.add_argument('-p', '--package', type=str, help='name of the package')
     parser.add_argument('--token', type=str, help='github_token for authentication')
+    parser.add_argument(
+        '--repository',
+        default=os.environ.get('GITHUB_REPOSITORY'),
+        help='GitHub owner/repository containing wheel releases',
+    )
 
     args = parser.parse_args()
     indexfile = Path(args.indexfile).resolve()
-    package = args.package if args.package else indexfile.parent.name
+    package = args.package or indexfile.parent.name
 
     old_wheels = ParseIndex(indexfile).wheels  # Global: used in Wheel.timestamp.
 
-    wheels = Wheels(package).get_wheels(token=args.token)
+    if not args.repository:
+        parser.error('--repository is required outside GitHub Actions')
+    wheels = Wheels(package, args.repository).get_wheels(token=args.token)
     names = [w.name for w in wheels]
     width = len(max(names, key=len))  # Global: used in Wheel.__str__.
 

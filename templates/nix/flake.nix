@@ -3,7 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    mkl-overlay.url = "github:urob/numpy-mkl";
+    mkl-overlay.url = "github:michael-denyer/numpy-mkl";
   };
 
   outputs =

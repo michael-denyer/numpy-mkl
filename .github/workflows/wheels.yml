@@ -2,6 +2,10 @@ name: Wheels
 
 on:
   workflow_call:
+    outputs:
+      matrix:
+        description: "Coordinates built by this workflow"
+        value: ${{ jobs.meta.outputs.matrix }}
     inputs:
       name:
         required: true
@@ -20,9 +24,11 @@ on:
         type: string
         description: "Version to build (default: latest release)"
 
+env:
+  PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+
 jobs:
   meta:
-    if: github.repository == 'michael-denyer/numpy-mkl'
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ env.tag }}
@@ -39,10 +45,16 @@ jobs:
           version-file: "pyproject.toml"
 
       - name: Fetch build matrix
+        env:
+          FORCE_BUILD: ${{ inputs.force-build || github.ref != 'refs/heads/main' }}
         run: |
+          force_args=()
+          if [[ "$FORCE_BUILD" == "true" ]]; then
+            force_args+=(--force-build)
+          fi
           uv run --locked tools/fetch_matrix2 ${{ inputs.name }} --config ci-targets.yaml \
             --store build.json --token ${{ secrets.GITHUB_TOKEN }} \
-            ${{ inputs.force-build && '--force-build' || '' }} >matrix.json
+            "${force_args[@]}" >matrix.json
 
           echo "tag=$(jq -rc '."tag"' matrix.json)" >>$GITHUB_ENV
           echo "version=$(jq -rc '."version"' matrix.json)" >>$GITHUB_ENV
@@ -321,7 +333,7 @@ jobs:
               uv pip install meson-python ninja cmake cython
               ;;
           esac
-          uv build --wheel --index https://michael-denyer.github.io/numpy-mkl ${args}
+          uv build --wheel --index "$PAGES_URL" ${args}
 
       - name: Repair wheel (Linux)
         env:
@@ -383,25 +395,35 @@ jobs:
               --exclude "mkl_*.dll" --exclude libsf_error_state.dll
         if: runner.os == 'windows'
 
+      - name: Download same-run dependency wheels
+        if: inputs.name != 'mkl-service'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        continue-on-error: true
+        with:
+          pattern: mkl-service-${{ matrix.python_version }}-${{ runner.os }}
+          path: dependency-wheelhouse
+          merge-multiple: true
+
+      - name: Download same-run numpy wheels
+        if: inputs.name == 'scipy'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        continue-on-error: true
+        with:
+          pattern: numpy-${{ matrix.python_version }}-${{ runner.os }}
+          path: dependency-wheelhouse
+          merge-multiple: true
+
       - name: Run tests
         run: |
           # Make sure we don't pick up the development MKL libraries.
           rm -rf "${{ env.MKL_VENV }}"
 
-          # Set up test environment. Resolving from our own index pulls the
-          # patched mkl-service, whose import hook locates and preloads the MKL
-          # runtime for numpy and scipy.
           uv venv testenv && source testenv/"${{ env.venv_bin }}"/activate
-          uv pip install wheelhouse/*.whl --index https://michael-denyer.github.io/numpy-mkl
-
-          # A feature branch cannot publish its patched mkl-service before this
-          # job tests numpy or scipy. Use the hook from the same checkout so the
-          # wheel is exercised without a loader path that end users would not have.
-          if [[ "${{ runner.os }}" == "Linux" &&
-                "${{ inputs.name }}" =~ ^(numpy|scipy)$ ]]; then
-            helper=$(python tools/get_file_in_pkg _init_helper.py --pkg mkl-service)
-            cp "${GITHUB_WORKSPACE}"/patches/mkl-service/_init_helper.py "$helper"
-          fi
+          shopt -s nullglob
+          dependency_wheels=(dependency-wheelhouse/*.whl)
+          built_wheels=(wheelhouse/*.whl)
+          uv pip install "${dependency_wheels[@]}" "${built_wheels[@]}" \
+              --index "$PAGES_URL"
 
           case "${{ inputs.name }}" in
             numpy)
@@ -426,13 +448,15 @@ jobs:
 
       - name: Store build information
         run: |
+          RECIPE_HASH=$(uv run --locked tools/build_recipe.py ${{ inputs.name }})
           cat >wheelhouse/versions-${{ matrix.python_version}}-${{ runner.os }}.json <<EOF
           {
             "name": "${{ inputs.name }}",
             "version": "${{ needs.meta.outputs.version }}",
             "python": "${{ matrix.python_version }}",
             "os": "${{ runner.os }}",
-            "mkl": "${{ env.MKL_VERSION }}"
+            "mkl": "${{ env.MKL_VERSION }}",
+            "recipe": "${RECIPE_HASH}"
           }
           EOF
 
@@ -509,7 +533,7 @@ jobs:
       - name: Write release notes
         run: |
           uv run --locked tools/release_notes templates/release.md \
-              --store build.json >release/release.md
+              --store build.json --index-url "$PAGES_URL" >release/release.md
 
       - name: Release wheels
         env:
@@ -523,7 +547,7 @@ jobs:
           # Wait 10s for release to get finished.
           sleep 10
           uv run --locked tools/make_index2 pypi/${{ inputs.name}}/index.html \
-              --token ${{ secrets.GITHUB_TOKEN }}
+              --repository "$GITHUB_REPOSITORY" --token ${{ secrets.GITHUB_TOKEN }}
 
       - name: Deploy index
         working-directory: pypi

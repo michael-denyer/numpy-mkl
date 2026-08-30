@@ -21,15 +21,23 @@ class Build:
         self.python = self.info['python']
         self.os = self.info['os'].lower()
         self.mkl = self.info['mkl']
+        self.recipe = self.info.get('recipe')
 
         self.key = '-'.join([self.name, self.version, self.python, self.os])
 
     def exclude(self, store, check_mkl=False):
-        bump_mkl = check_mkl and Version(self.mkl) > Version(store[self.key]['mkl'])
-        return self.key in store and not bump_mkl
+        if self.key not in store:
+            return False
+
+        stored = store[self.key]
+        bump_mkl = check_mkl and Version(self.mkl) > Version(stored['mkl'])
+        stale_recipe = self.recipe is not None and stored.get('recipe') != self.recipe
+        return not bump_mkl and not stale_recipe
 
     def merge_with(self, store):
-        store[self.key] = {'mkl': self.mkl}
+        if self.recipe is None:
+            raise ValueError('Build metadata is missing its recipe digest')
+        store[self.key] = {'mkl': self.mkl, 'recipe': self.recipe}
 
 
 def fetch_store(path):

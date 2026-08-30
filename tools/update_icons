@@ -5,9 +5,9 @@ import json
 from pathlib import Path
 
 ICONS = {
-    'numpy': '[![NumPy](https://img.shields.io/badge/NumPy-{0}-013243)](https://urob.github.io/numpy-mkl/numpy/)',
-    'scipy': '[![SciPy](https://img.shields.io/badge/SciPy-{0}-8caae6)](https://urob.github.io/numpy-mkl/scipy/)',
-    'mkl_service': '[![mkl-service](https://img.shields.io/badge/mkl--service-{0}-3b5526)](https://urob.github.io/numpy-mkl/mkl-service/)',
+    'numpy': '[![NumPy](https://img.shields.io/badge/NumPy-{0}-013243)](https://michael-denyer.github.io/numpy-mkl/numpy/)',
+    'scipy': '[![SciPy](https://img.shields.io/badge/SciPy-{0}-8caae6)](https://michael-denyer.github.io/numpy-mkl/scipy/)',
+    'mkl_service': '[![mkl-service](https://img.shields.io/badge/mkl--service-{0}-3b5526)](https://michael-denyer.github.io/numpy-mkl/mkl-service/)',
 }
 
 
@@ -25,7 +25,7 @@ def fetch_versions(package, builds):
 
 
 def format_version(version):
-    major, minor, patch = version.split('.')
+    major, minor, _patch = version.split('.')
     return '.'.join((major, minor))
 
 

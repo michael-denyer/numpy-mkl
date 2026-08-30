@@ -35,3 +35,10 @@ jobs:
       repo: scipy/scipy
       force-build: true
     needs: [links, mkl-service, numpy]
+
+  verify-package-set:
+    if: ${{ needs.scipy.outputs.matrix != 'null' }}
+    uses: ./.github/workflows/verify_package_set.yml
+    with:
+      matrix: ${{ needs.scipy.outputs.matrix }}
+    needs: [mkl-service, numpy, scipy]

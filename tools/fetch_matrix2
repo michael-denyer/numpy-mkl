@@ -7,6 +7,7 @@ from pathlib import Path
 
 import requests
 import yaml
+from build_recipe import recipe_hash
 from packaging.specifiers import SpecifierSet
 from packaging.version import InvalidVersion, Version
 from store_info import Build, fetch_store
@@ -143,6 +144,7 @@ class FetchBuildMatrix:
             'python': python_version,
             'os': self.fetch_os(runner[0]),
             'mkl': None,
+            'recipe': recipe_hash(self.package_name),
         }
         return Build(info).exclude(fetch_store(self.store))
 

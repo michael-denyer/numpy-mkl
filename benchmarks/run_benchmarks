@@ -8,7 +8,7 @@ VENV_DIR="${HOME}"/testenv
 # numpy-mkl
 uv venv "${VENV_DIR}"
 source "${VENV_DIR}"/bin/activate \
-  && uv pip install numpy scipy --index https://urob.github.io/numpy-mkl \
+  && uv pip install numpy scipy --index https://michael-denyer.github.io/numpy-mkl \
   && python "${SCRIPT_DIR}"/benchmarks.py \
   && deactivate
 rm -rf ${VENV_DIR}

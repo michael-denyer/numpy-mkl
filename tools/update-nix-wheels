@@ -27,7 +27,8 @@ PACKAGES = [
     'mkl-service',
 ]
 
-INDEX = 'https://urob.github.io/numpy-mkl'
+INDEX = 'https://michael-denyer.github.io/numpy-mkl'
+PACKAGE_REPOSITORY = 'https://github.com/michael-denyer/numpy-mkl/releases/download/'
 PLATFORM = 'x86_64-manylinux_2_28'
 
 PYPI = 'https://pypi.org/pypi/{package}/json'
@@ -103,7 +104,7 @@ class Resolution:
             return None
 
         packages = tomllib.loads(lock.read_text())['packages']
-        return {
+        wheels = {
             package['name']: {
                 'version': package['version'],
                 'url': package['wheels'][0]['url'],
@@ -111,6 +112,23 @@ class Resolution:
             }
             for package in packages
         }
+        missing = sorted(set(PACKAGES) - set(wheels))
+        if missing:
+            raise ResolutionError(
+                f'{self.python} did not resolve the complete fork package set: '
+                + ', '.join(missing)
+            )
+        foreign = [
+            name
+            for name in PACKAGES
+            if name in wheels and not wheels[name]['url'].startswith(PACKAGE_REPOSITORY)
+        ]
+        if foreign:
+            raise ResolutionError(
+                f'{self.python} resolved repo package(s) outside this fork: '
+                + ', '.join(foreign)
+            )
+        return wheels
 
     def fetch_dependencies(self, wheels):
         """Invert uv's `# via` annotations into a forward dependency graph."""
@@ -277,7 +295,9 @@ if __name__ == '__main__':
             if resolved := Resolution(python, Path(tmp), index).resolve():
                 resolutions[python] = resolved
             else:
-                print(f'Skipping python {python}: no wheels available')
+                raise ResolutionError(
+                    f'No complete fork package set resolves for python {python}'
+                )
 
     if not resolutions:
         raise ResolutionError('No python version resolves against the index')

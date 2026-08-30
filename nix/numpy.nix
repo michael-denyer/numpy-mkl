@@ -46,7 +46,7 @@ buildPythonPackage {
 
   meta = {
     description = "MKL-accelerated NumPy package";
-    homepage = "https://github.com/urob/numpy-mkl";
+    homepage = "https://github.com/michael-denyer/numpy-mkl";
     license = lib.licenses.bsd3;
     platforms = [ "x86_64-linux" ];
   };

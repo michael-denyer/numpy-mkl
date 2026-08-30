@@ -50,6 +50,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Create release notes from template')
     parser.add_argument('template', type=str, help='template file')
     parser.add_argument('-s', '--store', required=True, type=str, help='store file')
+    parser.add_argument('--index-url', required=True, help='package index URL')
 
     args = parser.parse_args()
     builds = fetch_builds(Path(args.store))
@@ -62,5 +63,9 @@ if __name__ == '__main__':
 
     md_table = tabulate(table[1:], headers=table[0], tablefmt='github')
 
-    notes = template.format(date=time.strftime('%Y-%m-%d'), latest=md_table)
+    notes = template.format(
+        date=time.strftime('%Y-%m-%d'),
+        latest=md_table,
+        index_url=args.index_url.rstrip('/'),
+    )
     print(notes)

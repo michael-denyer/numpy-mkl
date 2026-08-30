@@ -9,6 +9,9 @@ on:
 permissions:
   contents: write
 
+env:
+  PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+
 jobs:
   links:
     runs-on: ubuntu-latest
@@ -51,7 +54,7 @@ jobs:
           # actually served, so that a build chained after this workflow resolves against
           # it. Poll a file this commit changed, so the check can't pass on stale content.
           file=$(git -C pypi show --name-only --format= HEAD | head -1)
-          url="https://urob.github.io/numpy-mkl/${file%/index.html}/"
+          url="${PAGES_URL}/${file%/index.html}/"
           for _ in $(seq 60); do
             if served=$(curl -sSf -H 'Cache-Control: no-cache' "$url") \
                 && [[ "$served" == "$(cat "pypi/${file}")" ]]; then
