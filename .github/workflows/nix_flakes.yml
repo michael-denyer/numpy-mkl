@@ -6,6 +6,9 @@ on:
     workflows:
       - Build wheels
       - Rebuild all
+      - Rebuild mkl-service matched set
+      - Rebuild NumPy matched set
+      - Rebuild SciPy matched set
     types: [completed]
 
 permissions:

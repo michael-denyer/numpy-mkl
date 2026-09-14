@@ -328,9 +328,9 @@ class TestWorkflowContracts(unittest.TestCase):
         self.assertIn("github.repository == 'michael-denyer/numpy-mkl'", workflow)
         self.assertIn("github.event.workflow_run.conclusion == 'success'", workflow)
         self.assertIn("github.event.workflow_run.head_branch == 'main'", workflow)
-        self.assertNotIn('Rebuild numpy', workflow)
-        self.assertNotIn('Rebuild scipy', workflow)
-        self.assertNotIn('Rebuild mkl-service', workflow)
+        self.assertIn('- Rebuild mkl-service matched set', workflow)
+        self.assertIn('- Rebuild NumPy matched set', workflow)
+        self.assertIn('- Rebuild SciPy matched set', workflow)
         self.assertTrue(pins.rstrip().endswith('{}'))
 
     def test_regression_suite_is_wired_into_preflight(self):
