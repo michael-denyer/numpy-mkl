@@ -152,6 +152,25 @@ class TestBuildIdentity(unittest.TestCase):
             self.assertRegex(build['recipe'], r'^sha256:[0-9a-f]{64}$')
 
 
+class TestReleaseTagGuard(unittest.TestCase):
+    def setUp(self):
+        self.fetch_matrix = runpy.run_path(str(TOOLS / 'fetch_matrix2'))
+
+    def parse(self, tag):
+        cls = self.fetch_matrix['FetchPackageData']
+        instance = cls.__new__(cls)
+        return instance.parse_release_tag({'tag_name': tag, 'prerelease': False})
+
+    def test_plain_release_tag_is_accepted(self):
+        self.assertEqual(self.parse('2.5.3'), ('2.5.3', '2.5.3'))
+
+    def test_tag_with_trailing_newline_is_refused(self):
+        with self.assertRaisesRegex(
+            self.fetch_matrix['FetchPackageDataError'], 'Refusing unsafe release tag'
+        ):
+            self.parse('2.5.3\n')
+
+
 class TestWorkflowContracts(unittest.TestCase):
     def workflow(self, name):
         return (ROOT / '.github/workflows' / name).read_text()

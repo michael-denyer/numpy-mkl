@@ -16,6 +16,8 @@ jobs:
     name: package-set-${{ matrix.python_version }} (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
     container: ${{ matrix.container }}
+    permissions:
+      contents: read
     strategy:
       matrix: ${{ fromJSON(inputs.matrix) }}
       fail-fast: false

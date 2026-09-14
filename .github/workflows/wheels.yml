@@ -32,6 +32,8 @@ jobs:
     name: ${{ inputs.name }}-${{ matrix.python_version }} (${{ matrix.runner }})
     runs-on: ${{ matrix.runner }}
     container: ${{ matrix.container }}
+    permissions:
+      contents: read
     env:
       PACKAGE_NAME: ${{ inputs.name }}
       PACKAGE_VERSION: ${{ inputs.version }}

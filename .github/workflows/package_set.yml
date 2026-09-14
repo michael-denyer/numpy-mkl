@@ -67,12 +67,12 @@ jobs:
       - name: Plan common package set
         id: plan
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FORCE_BUILD: ${{ inputs.force-build || github.ref != 'refs/heads/main' }}
         run: |
           for package in mkl-service numpy scipy; do
             uv run --locked tools/fetch_matrix2 "$package" \
-              --config ci-targets.yaml --store build.json --token "$GH_TOKEN" \
+              --config ci-targets.yaml --store build.json \
               >"$package.json"
           done
 
@@ -210,11 +210,13 @@ jobs:
           gh release create "$VERSION" --title "$VERSION" \
             --notes-file release/release.md release/*.whl
       - name: Generate package indexes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           sleep 10
           for package in mkl-service numpy scipy; do
             uv run --locked tools/make_index2 "pypi/$package/index.html" \
-              --repository "$GITHUB_REPOSITORY" --token ${{ secrets.GITHUB_TOKEN }}
+              --repository "$GITHUB_REPOSITORY"
           done
       - name: Deploy complete package set index
         working-directory: pypi
