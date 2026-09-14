@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import runpy
 import sys
 import tempfile
@@ -313,7 +314,7 @@ class TestWorkflowContracts(unittest.TestCase):
             finish(False, 'Windows')
         self.assertEqual(exited.exception.code, True)
 
-    def test_nix_stays_empty_until_complete_fork_pins_exist(self):
+    def test_nix_pins_resolve_fork_packages_from_fork_releases(self):
         pins = (ROOT / 'nix/wheels.nix').read_text()
         updater = (TOOLS / 'update-nix-wheels').read_text()
         workflow = self.workflow('nix_flakes.yml')
@@ -331,7 +332,20 @@ class TestWorkflowContracts(unittest.TestCase):
         self.assertIn('- Rebuild mkl-service matched set', workflow)
         self.assertIn('- Rebuild NumPy matched set', workflow)
         self.assertIn('- Rebuild SciPy matched set', workflow)
-        self.assertTrue(pins.rstrip().endswith('{}'))
+
+        targets = yaml.safe_load((ROOT / 'ci-targets.yaml').read_text())
+        pinned = re.findall(r'^  "(\d+\.\d+)" = \{', pins, flags=re.MULTILINE)
+        self.assertEqual(pinned, targets['defaults']['python_versions'])
+        fork = 'https://github.com/michael-denyer/numpy-mkl/releases/download/'
+        for package in ('numpy', 'scipy', 'mkl-service'):
+            urls = re.findall(
+                rf'^    {package} = \{{\n      version = "[^"]+";\n      url = "([^"]+)";',
+                pins,
+                flags=re.MULTILINE,
+            )
+            self.assertEqual(len(urls), len(pinned), package)
+            for url in urls:
+                self.assertTrue(url.startswith(fork), url)
 
     def test_regression_suite_is_wired_into_preflight(self):
         coordinator = self.workflow('package_set.yml')
