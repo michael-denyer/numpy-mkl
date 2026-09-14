@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version-file: "pyproject.toml"
       - name: Run branch regression tests
@@ -61,18 +61,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version-file: "pyproject.toml"
       - name: Plan common package set
         id: plan
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FORCE_BUILD: ${{ inputs.force-build || github.ref != 'refs/heads/main' }}
         run: |
           for package in mkl-service numpy scipy; do
             uv run --locked tools/fetch_matrix2 "$package" \
-              --config ci-targets.yaml --store build.json --token "$GH_TOKEN" \
+              --config ci-targets.yaml --store build.json \
               >"$package.json"
           done
 
@@ -162,7 +162,7 @@ jobs:
           ref: pypi
           path: pypi
           persist-credentials: true
-      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version-file: "pyproject.toml"
       - name: Fetch mkl-service wheels
@@ -210,11 +210,13 @@ jobs:
           gh release create "$VERSION" --title "$VERSION" \
             --notes-file release/release.md release/*.whl
       - name: Generate package indexes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           sleep 10
           for package in mkl-service numpy scipy; do
             uv run --locked tools/make_index2 "pypi/$package/index.html" \
-              --repository "$GITHUB_REPOSITORY" --token ${{ secrets.GITHUB_TOKEN }}
+              --repository "$GITHUB_REPOSITORY"
           done
       - name: Deploy complete package set index
         working-directory: pypi

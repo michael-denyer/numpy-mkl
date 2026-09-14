@@ -135,7 +135,12 @@ if __name__ == '__main__':
 
     parser.add_argument('indexfile', type=str, help='path to index')
     parser.add_argument('-p', '--package', type=str, help='name of the package')
-    parser.add_argument('--token', type=str, help='github_token for authentication')
+    parser.add_argument(
+        '--token',
+        type=str,
+        default=os.environ.get('GITHUB_TOKEN'),
+        help='github token for authentication (default: $GITHUB_TOKEN)',
+    )
     parser.add_argument(
         '--repository',
         default=os.environ.get('GITHUB_REPOSITORY'),

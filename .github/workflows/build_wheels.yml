@@ -6,6 +6,8 @@ on:
   schedule:
     - cron: "15 22 * * 0" # 22.15 UTC every Sunday
 
+permissions: {}
+
 jobs:
   verify:
     if: ${{ github.event_name == 'pull_request' || github.ref != 'refs/heads/main' }}

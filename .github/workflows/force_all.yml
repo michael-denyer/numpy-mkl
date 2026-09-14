@@ -3,6 +3,8 @@ name: Rebuild all
 on:
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   verify:
     if: ${{ github.ref != 'refs/heads/main' }}

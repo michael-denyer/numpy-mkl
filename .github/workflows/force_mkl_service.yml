@@ -3,6 +3,8 @@ name: Rebuild mkl-service matched set
 on:
   workflow_dispatch:
 
+permissions: {}
+
 # Publishing one package is unsafe: this shortcut forces and verifies the matched set.
 jobs:
   verify:
