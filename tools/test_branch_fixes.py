@@ -214,6 +214,25 @@ class TestWorkflowContracts(unittest.TestCase):
         self.assertIn('Expected one SciPy wheel', verifier)
         self.assertIn('tools/verify_package_set.py', verifier)
 
+    def test_numpy_version_input_reaches_the_plan(self):
+        orchestrator = yaml.safe_load(self.workflow('build_wheels.yml'))
+        coordinator = yaml.safe_load(self.workflow('package_set.yml'))
+
+        dispatch = orchestrator[True]['workflow_dispatch']['inputs']['numpy-version']
+        self.assertEqual(dispatch['default'], '')
+        for job in ('verify', 'publish'):
+            self.assertEqual(
+                orchestrator['jobs'][job]['with']['numpy-version'],
+                '${{ inputs.numpy-version }}',
+            )
+        self.assertEqual(
+            coordinator[True]['workflow_call']['inputs']['numpy-version']['default'], ''
+        )
+        plan = coordinator['jobs']['plan']['steps'][-1]
+        self.assertEqual(plan['env']['NUMPY_VERSION'], '${{ inputs.numpy-version }}')
+        self.assertIn('version_args+=(--version "$NUMPY_VERSION")', plan['run'])
+        self.assertIn('"${version_args[@]}" >"$package.json"', plan['run'])
+
     def test_every_force_workflow_routes_through_package_set(self):
         for name in ('force_mkl_service.yml', 'force_numpy.yml', 'force_scipy.yml'):
             with self.subTest(workflow=name):

@@ -12,6 +12,11 @@ on:
         required: true
         type: boolean
         description: "Publish after exact package-set verification"
+      numpy-version:
+        required: false
+        type: string
+        default: ""
+        description: "Build this NumPy release instead of the ci-targets.yaml target"
 
 env:
   PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
@@ -69,11 +74,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FORCE_BUILD: ${{ inputs.force-build || github.ref != 'refs/heads/main' }}
+          NUMPY_VERSION: ${{ inputs.numpy-version }}
         run: |
           for package in mkl-service numpy scipy; do
+            version_args=()
+            [[ "$package" == numpy && -n "$NUMPY_VERSION" ]] &&
+              version_args+=(--version "$NUMPY_VERSION")
             uv run --locked tools/fetch_matrix2 "$package" \
               --config ci-targets.yaml --store build.json \
-              >"$package.json"
+              "${version_args[@]}" >"$package.json"
           done
 
           force_args=()

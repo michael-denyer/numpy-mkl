@@ -2,6 +2,12 @@ name: Build wheels
 
 on:
   workflow_dispatch:
+    inputs:
+      numpy-version:
+        required: false
+        type: string
+        default: ""
+        description: "Build this NumPy release instead of the ci-targets.yaml target (e.g. 2.4.6)"
   pull_request:
   schedule:
     - cron: "15 22 * * 0" # 22.15 UTC every Sunday
@@ -20,6 +26,7 @@ jobs:
     with:
       force-build: true
       publish: false
+      numpy-version: ${{ inputs.numpy-version }}
 
   publish:
     if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
@@ -29,3 +36,4 @@ jobs:
     with:
       force-build: false
       publish: true
+      numpy-version: ${{ inputs.numpy-version }}
