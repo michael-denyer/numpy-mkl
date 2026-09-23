@@ -187,27 +187,27 @@
   },
   "mkl_service-2.8.0-cp312-linux": {
     "mkl": "2026.1.0",
-    "recipe": "sha256:8a134f6d619cad4ce541a57377e98164e9e8d711da42e41fd96c9ec8efa05f3a"
+    "recipe": "sha256:1ef3d155b97c550ed4ae1d06511efbaafb8061ae61f11d5bb592d86d87252c95"
   },
   "mkl_service-2.8.0-cp312-windows": {
     "mkl": "2026.1.0",
-    "recipe": "sha256:6096f938523e6758c76b94b8e007c71659ad9e094a3cc429c4ecda1ad4a82074"
+    "recipe": "sha256:de7269c0001f4f26376c0af3104723d8a7e0cb0a3abcd2f701eb3d78fffb2be6"
   },
   "mkl_service-2.8.0-cp313-linux": {
     "mkl": "2026.1.0",
-    "recipe": "sha256:8a134f6d619cad4ce541a57377e98164e9e8d711da42e41fd96c9ec8efa05f3a"
+    "recipe": "sha256:1ef3d155b97c550ed4ae1d06511efbaafb8061ae61f11d5bb592d86d87252c95"
   },
   "mkl_service-2.8.0-cp313-windows": {
     "mkl": "2026.1.0",
-    "recipe": "sha256:6096f938523e6758c76b94b8e007c71659ad9e094a3cc429c4ecda1ad4a82074"
+    "recipe": "sha256:de7269c0001f4f26376c0af3104723d8a7e0cb0a3abcd2f701eb3d78fffb2be6"
   },
   "mkl_service-2.8.0-cp314-linux": {
     "mkl": "2026.1.0",
-    "recipe": "sha256:8a134f6d619cad4ce541a57377e98164e9e8d711da42e41fd96c9ec8efa05f3a"
+    "recipe": "sha256:1ef3d155b97c550ed4ae1d06511efbaafb8061ae61f11d5bb592d86d87252c95"
   },
   "mkl_service-2.8.0-cp314-windows": {
     "mkl": "2026.1.0",
-    "recipe": "sha256:6096f938523e6758c76b94b8e007c71659ad9e094a3cc429c4ecda1ad4a82074"
+    "recipe": "sha256:de7269c0001f4f26376c0af3104723d8a7e0cb0a3abcd2f701eb3d78fffb2be6"
   },
   "numpy-2.1.3-cp310-linux": {
     "mkl": "2025.1.0"
@@ -576,22 +576,28 @@
     "mkl": "2026.0.0"
   },
   "numpy-2.4.6-cp312-linux": {
-    "mkl": "2026.0.0"
+    "mkl": "2026.1.0",
+    "recipe": "sha256:87ea653f53b1376a2a93a4942630e7d5940bef72969a6acf26295ba1569b0127"
   },
   "numpy-2.4.6-cp312-windows": {
-    "mkl": "2026.0.0"
+    "mkl": "2026.1.0",
+    "recipe": "sha256:16dca2ddfe9de08dca93bcaae746a4b6685fe19853cd9de2f24d2df36f263ccd"
   },
   "numpy-2.4.6-cp313-linux": {
-    "mkl": "2026.0.0"
+    "mkl": "2026.1.0",
+    "recipe": "sha256:87ea653f53b1376a2a93a4942630e7d5940bef72969a6acf26295ba1569b0127"
   },
   "numpy-2.4.6-cp313-windows": {
-    "mkl": "2026.0.0"
+    "mkl": "2026.1.0",
+    "recipe": "sha256:16dca2ddfe9de08dca93bcaae746a4b6685fe19853cd9de2f24d2df36f263ccd"
   },
   "numpy-2.4.6-cp314-linux": {
-    "mkl": "2026.0.0"
+    "mkl": "2026.1.0",
+    "recipe": "sha256:87ea653f53b1376a2a93a4942630e7d5940bef72969a6acf26295ba1569b0127"
   },
   "numpy-2.4.6-cp314-windows": {
-    "mkl": "2026.0.0"
+    "mkl": "2026.1.0",
+    "recipe": "sha256:16dca2ddfe9de08dca93bcaae746a4b6685fe19853cd9de2f24d2df36f263ccd"
   },
   "numpy-2.5.0-cp312-linux": {
     "mkl": "2026.0.0"
@@ -877,26 +883,26 @@
   },
   "scipy-1.18.1-cp312-linux": {
     "mkl": "2026.1.0",
-    "recipe": "sha256:fce3613f33a6e1f832a2a8ec5c4367be162b34e5864ab29537f9cff2ae4e0037"
+    "recipe": "sha256:fd4414d96ad4abf2254d253e64689869c3a0aa4ed7e2cd29796a9a0351758716"
   },
   "scipy-1.18.1-cp312-windows": {
     "mkl": "2026.1.0",
-    "recipe": "sha256:8e6c63fbf44f1ac2f9286678fe981fe5b783dd9844b4bb79f7f3d2ac624d1cba"
+    "recipe": "sha256:715583c6fd04d3625030182410660401944bb23632cd1d53d58d6096e8134290"
   },
   "scipy-1.18.1-cp313-linux": {
     "mkl": "2026.1.0",
-    "recipe": "sha256:fce3613f33a6e1f832a2a8ec5c4367be162b34e5864ab29537f9cff2ae4e0037"
+    "recipe": "sha256:fd4414d96ad4abf2254d253e64689869c3a0aa4ed7e2cd29796a9a0351758716"
   },
   "scipy-1.18.1-cp313-windows": {
     "mkl": "2026.1.0",
-    "recipe": "sha256:8e6c63fbf44f1ac2f9286678fe981fe5b783dd9844b4bb79f7f3d2ac624d1cba"
+    "recipe": "sha256:715583c6fd04d3625030182410660401944bb23632cd1d53d58d6096e8134290"
   },
   "scipy-1.18.1-cp314-linux": {
     "mkl": "2026.1.0",
-    "recipe": "sha256:fce3613f33a6e1f832a2a8ec5c4367be162b34e5864ab29537f9cff2ae4e0037"
+    "recipe": "sha256:fd4414d96ad4abf2254d253e64689869c3a0aa4ed7e2cd29796a9a0351758716"
   },
   "scipy-1.18.1-cp314-windows": {
     "mkl": "2026.1.0",
-    "recipe": "sha256:8e6c63fbf44f1ac2f9286678fe981fe5b783dd9844b4bb79f7f3d2ac624d1cba"
+    "recipe": "sha256:715583c6fd04d3625030182410660401944bb23632cd1d53d58d6096e8134290"
   }
 }
