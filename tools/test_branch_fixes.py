@@ -520,6 +520,19 @@ class TestVendoredRuntimeCheck(unittest.TestCase):
         self.assertIn("--exclude 'libiomp5*'", repair)
 
 
+class TestDistributorInitPatches(unittest.TestCase):
+    def test_missing_mkl_service_is_an_import_error_not_a_warning(self):
+        for package in ('numpy', 'scipy'):
+            with self.subTest(package=package):
+                patch_text = (ROOT / 'patches' / package / 'init_mkl.patch').read_text()
+                self.assertIn('+    import mkl\n', patch_text)
+                self.assertIn('+except ImportError as e:\n', patch_text)
+                self.assertIn('+    raise ImportError(\n', patch_text)
+                self.assertIn('+    ) from e\n', patch_text)
+                self.assertNotIn('warnings.warn', patch_text)
+                self.assertIn('https://michael-denyer.github.io/numpy-mkl', patch_text)
+
+
 class TestPackageSetPlan(unittest.TestCase):
     @staticmethod
     def package(name, full_versions, stale_versions=()):
