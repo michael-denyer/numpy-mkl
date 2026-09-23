@@ -13,8 +13,13 @@ import os
 from importlib.metadata import PackageNotFoundError, files
 
 MKL_DISTRIBUTION = 'mkl'
+OPENMP_DISTRIBUTION = 'intel-openmp'
 WINDOWS_RUNTIMES = (('dispatcher', '*mkl_rt*.dll'),)
 WINDOWS_ILP64_EXPORTS = ('DGEMM_64', 'DGESV_64')
+# The Linux numpy wheel links libiomp5.so and vendors no copy of it, so the
+# intel-openmp library has to be in the process before libmkl_intel_thread and
+# before numpy's extension modules resolve their NEEDED entries.
+LINUX_OPENMP_RUNTIMES = (('OpenMP runtime', '*libiomp5.so'),)
 LINUX_RUNTIMES = (
     ('dispatcher', '*libmkl_rt.so*'),
     ('core', '*libmkl_core.so*'),
@@ -103,13 +108,26 @@ def _initialize_windows(installed_files):
 
 def _initialize_linux(installed_files):
     mode = os.RTLD_LAZY | ctypes.RTLD_GLOBAL
+    openmp_files = _distribution_files(OPENMP_DISTRIBUTION)
+    required = (
+        *(
+            (OPENMP_DISTRIBUTION, role, runtime)
+            for role, runtime in _required_files(
+                openmp_files, LINUX_OPENMP_RUNTIMES, OPENMP_DISTRIBUTION
+            )
+        ),
+        *(
+            (MKL_DISTRIBUTION, role, runtime)
+            for role, runtime in _required_files(installed_files, LINUX_RUNTIMES)
+        ),
+    )
     handles = []
-    for role, runtime in _required_files(installed_files, LINUX_RUNTIMES):
+    for distribution, role, runtime in required:
         try:
             handles.append(ctypes.CDLL(runtime, mode=mode))
         except OSError as e:
             raise ImportError(
-                f"Cannot initialize MKL runtime from distribution '{MKL_DISTRIBUTION}': "
+                f"Cannot initialize MKL runtime from distribution '{distribution}': "
                 f"failed to load {role} library '{runtime}': {e}"
             ) from e
     return tuple(handles)

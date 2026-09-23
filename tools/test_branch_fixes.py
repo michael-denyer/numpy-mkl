@@ -512,6 +512,13 @@ class TestVendoredRuntimeCheck(unittest.TestCase):
         self.assertIn('tools/check_vendored_runtime.py wheelhouse/*.whl', step['run'])
         self.assertIn('tools/check_vendored_runtime.py', build_recipe.COMMON_FILES)
 
+    def test_linux_repair_excludes_mkl_and_openmp_runtimes(self):
+        workflow = yaml.safe_load((ROOT / '.github/workflows/wheels.yml').read_text())
+        steps = {s['name']: s for s in workflow['jobs']['build']['steps']}
+        repair = steps['Repair wheel (Linux)']['run']
+        self.assertIn("--exclude 'libmkl*'", repair)
+        self.assertIn("--exclude 'libiomp5*'", repair)
+
 
 class TestPackageSetPlan(unittest.TestCase):
     @staticmethod

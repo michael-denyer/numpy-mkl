@@ -88,11 +88,15 @@ same MKL installation. SciPy stays LP64 on Windows.
 
 ### Linux ILP64 runtime
 
-The Linux numpy wheel links `libmkl_intel_ilp64.so.3`, `libmkl_intel_thread.so.3` and
-`libmkl_core.so.3` directly. The patched `mkl-service` hook loads those libraries from the
-installed `mkl` package before numpy imports its extension modules. It loads `libmkl_rt` first,
-so unsuffixed LP64 symbols and suffixed ILP64 symbols both resolve through the dispatcher rather
-than letting the direct ILP64 interface capture LP64 calls.
+The Linux numpy wheel links `libmkl_intel_ilp64.so.3`, `libmkl_intel_thread.so.3`,
+`libmkl_core.so.3` and `libiomp5.so` directly and vendors none of them. The patched
+`mkl-service` hook loads `libiomp5.so` from the installed `intel-openmp` package, then the MKL
+libraries from the installed `mkl` package, before numpy imports its extension modules. It
+loads `libmkl_rt` first among the MKL libraries, so unsuffixed LP64 symbols and suffixed ILP64
+symbols both resolve through the dispatcher rather than letting the direct ILP64 interface
+capture LP64 calls. `tools/check_vendored_runtime.py` fails the build if a wheel vendors any
+MKL, OpenMP or TBB runtime library: two OpenMP runtimes in one process tear down against each
+other at exit.
 
 Vendoring the direct libraries is not a substitute. `auditwheel` copies only link-time libraries,
 while MKL loads its compute kernels (`libmkl_def`, `libmkl_avx2`, `libmkl_avx512`) at runtime from
