@@ -2,18 +2,17 @@ diff --git a/scipy/_distributor_init.py b/scipy/_distributor_init.py
 index 5df13497..67866a5b 100644
 --- a/scipy/_distributor_init.py
 +++ b/scipy/_distributor_init.py
-@@ -16,3 +16,14 @@ try:
+@@ -16,3 +16,13 @@ try:
      from . import _distributor_init_local  # noqa: F401
  except ImportError:
      pass
 +
 +try:
 +    import mkl
-+except ImportError:
-+    import warnings
-+
-+    warnings.warn(
-+        "Failed to import mkl-service. Please install it or manually add the MKL "
-+        "library to LD_LIBRARY_PATH",
-+        stacklevel=2,
-+    )
++except ImportError as e:
++    raise ImportError(
++        "scipy from https://michael-denyer.github.io/numpy-mkl links the MKL "
++        "runtime and vendors no copy of it: install 'mkl' (which pulls in "
++        "'intel-openmp') and 'mkl-service' from that index before importing "
++        "scipy."
++    ) from e

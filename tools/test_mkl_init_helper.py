@@ -13,6 +13,7 @@ from unittest.mock import call, patch
 
 HELPER = Path(__file__).parents[1] / 'patches/mkl-service/_init_helper.py'
 LINUX_NAMES = (
+    'libiomp5.so',
     'libmkl_rt.so.3',
     'libmkl_core.so.3',
     'libmkl_intel_thread.so.3',
@@ -90,6 +91,40 @@ class TestMklRuntimeInitialization(unittest.TestCase):
         with self.assertRaisesRegex(ImportError, "distribution 'mkl' is not installed"):
             runpy.run_path(str(HELPER))
 
+    @patch('importlib.metadata.files')
+    def test_linux_requires_intel_openmp_distribution(self, distribution_files):
+        installed = self.runtime_files()
+
+        def files(distribution):
+            if distribution == 'intel-openmp':
+                raise PackageNotFoundError(distribution)
+            return installed
+
+        distribution_files.side_effect = files
+        with (
+            linux_platform(),
+            self.assertRaisesRegex(
+                ImportError, "distribution 'intel-openmp' is not installed"
+            ),
+        ):
+            runpy.run_path(str(HELPER))
+
+    @patch('importlib.metadata.files')
+    def test_linux_missing_openmp_library_names_its_distribution(
+        self, distribution_files
+    ):
+        distribution_files.return_value = self.runtime_files(LINUX_NAMES[1:])
+
+        with (
+            linux_platform(),
+            self.assertRaisesRegex(
+                ImportError,
+                "from distribution 'intel-openmp': missing OpenMP runtime library "
+                "matching '\\*libiomp5.so'",
+            ),
+        ):
+            runpy.run_path(str(HELPER))
+
     @patch('importlib.metadata.files', return_value=None)
     def test_missing_distribution_metadata_is_contextual_import_error(
         self, _distribution_files
@@ -132,7 +167,8 @@ class TestMklRuntimeInitialization(unittest.TestCase):
             linux_platform(),
             self.assertRaisesRegex(
                 ImportError,
-                "failed to load dispatcher library '.*libmkl_rt.so.3': wrong ELF",
+                "from distribution 'intel-openmp': failed to load OpenMP runtime "
+                "library '.*libiomp5.so': wrong ELF",
             ),
         ):
             runpy.run_path(str(HELPER))

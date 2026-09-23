@@ -280,10 +280,14 @@ jobs:
           # libmkl_intel_ilp64.so.3 alongside the LP64 one. Vendoring bundles only
           # the link-time libs, while MKL dlopen()s its compute kernels
           # (libmkl_def, libmkl_avx2, libmkl_avx512) at runtime and they would be
-          # missing from the wheel.
+          # missing from the wheel. Never vendor the OpenMP runtime either: the
+          # iomp build links libiomp5.so, mkl-service preloads the intel-openmp
+          # copy, and a second copy in numpy.libs tears down against the first
+          # in _dl_fini (exit-time SIGSEGV).
           uv run --locked --only-group build-deps \
               auditwheel repair "${{ env.SRC_DIR }}"/dist/*.whl -w wheelhouse \
-              --exclude 'libmkl*' --plat=manylinux_${plat} --strip
+              --exclude 'libmkl*' --exclude 'libiomp5*' \
+              --plat=manylinux_${plat} --strip
         if: runner.os == 'Linux'
 
       - name: Show wheel dependencies (Windows)
@@ -329,6 +333,12 @@ jobs:
               --add-path "${{ env.MKL_VENV }}/Library/bin" \
               --exclude "mkl_*.dll" --exclude libsf_error_state.dll
         if: runner.os == 'Windows'
+
+      - name: Check vendored runtime libraries
+        run: |
+          # One MKL stack and one OpenMP runtime per process: both come from the
+          # mkl and intel-openmp packages, never from <package>.libs.
+          uv run --locked python tools/check_vendored_runtime.py wheelhouse/*.whl
 
       - name: Download same-run dependency wheels
         if: inputs.name != 'mkl-service'

@@ -19,6 +19,7 @@ TOOLS = ROOT / 'tools'
 sys.path.insert(0, str(TOOLS))
 
 import build_recipe  # noqa: E402
+import check_vendored_runtime  # noqa: E402
 import package_set_plan  # noqa: E402
 import verify_package_set  # noqa: E402
 import write_build_info  # noqa: E402
@@ -444,6 +445,92 @@ class TestPackageSetIdentity(unittest.TestCase):
 
         self.assertEqual(identity.distribution, 'mkl-service')
         self.assertEqual(identity.version, '2.8.0')
+
+
+class TestVendoredRuntimeCheck(unittest.TestCase):
+    @staticmethod
+    def wheel(directory, *names):
+        wheel = Path(directory) / 'numpy-2.5.3-cp312-cp312-manylinux_2_28_x86_64.whl'
+        with zipfile.ZipFile(wheel, 'w') as archive:
+            archive.writestr('numpy-2.5.3.dist-info/METADATA', 'Name: numpy\n')
+            for name in names:
+                archive.writestr(name, b'')
+        return wheel
+
+    def test_vendored_openmp_and_mkl_are_reported(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            wheel = self.wheel(
+                temporary_directory,
+                'numpy.libs/libiomp5-19cd02fb.so',
+                'numpy.libs/libmkl_core-4dbf719a.so.3',
+                'numpy.libs/libtbbmalloc-1a2b3c4d.so.2',
+                'numpy.libs/libgfortran-040039e1.so.5.0.0',
+                'numpy/_core/_multiarray_umath.cpython-312-x86_64-linux-gnu.so',
+            )
+            self.assertEqual(
+                check_vendored_runtime.vendored_runtime_libraries(wheel),
+                [
+                    'numpy.libs/libiomp5-19cd02fb.so',
+                    'numpy.libs/libmkl_core-4dbf719a.so.3',
+                    'numpy.libs/libtbbmalloc-1a2b3c4d.so.2',
+                ],
+            )
+
+    def test_windows_runtime_dlls_are_reported(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            wheel = self.wheel(
+                temporary_directory,
+                'numpy.libs/mkl_rt.3.dll',
+                'numpy.libs/libiomp5md.dll',
+                'numpy.libs/msvcp140.dll',
+            )
+            self.assertEqual(
+                check_vendored_runtime.vendored_runtime_libraries(wheel),
+                ['numpy.libs/mkl_rt.3.dll', 'numpy.libs/libiomp5md.dll'],
+            )
+
+    def test_clean_wheel_passes(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            wheel = self.wheel(
+                temporary_directory,
+                'numpy.libs/libgfortran-040039e1.so.5.0.0',
+                'numpy/_core/_multiarray_umath.cpython-312-x86_64-linux-gnu.so',
+            )
+            self.assertEqual(
+                check_vendored_runtime.vendored_runtime_libraries(wheel), []
+            )
+
+    def test_check_runs_after_both_repair_steps(self):
+        workflow = yaml.safe_load((ROOT / '.github/workflows/wheels.yml').read_text())
+        names = [step['name'] for step in workflow['jobs']['build']['steps']]
+        check = names.index('Check vendored runtime libraries')
+        self.assertGreater(check, names.index('Repair wheel (Linux)'))
+        self.assertGreater(check, names.index('Repair wheel (Windows)'))
+        self.assertLess(check, names.index('Run tests'))
+        step = workflow['jobs']['build']['steps'][check]
+        self.assertNotIn('if', step)
+        self.assertIn('tools/check_vendored_runtime.py wheelhouse/*.whl', step['run'])
+        self.assertIn('tools/check_vendored_runtime.py', build_recipe.COMMON_FILES)
+
+    def test_linux_repair_excludes_mkl_and_openmp_runtimes(self):
+        workflow = yaml.safe_load((ROOT / '.github/workflows/wheels.yml').read_text())
+        steps = {s['name']: s for s in workflow['jobs']['build']['steps']}
+        repair = steps['Repair wheel (Linux)']['run']
+        self.assertIn("--exclude 'libmkl*'", repair)
+        self.assertIn("--exclude 'libiomp5*'", repair)
+
+
+class TestDistributorInitPatches(unittest.TestCase):
+    def test_missing_mkl_service_is_an_import_error_not_a_warning(self):
+        for package in ('numpy', 'scipy'):
+            with self.subTest(package=package):
+                patch_text = (ROOT / 'patches' / package / 'init_mkl.patch').read_text()
+                self.assertIn('+    import mkl\n', patch_text)
+                self.assertIn('+except ImportError as e:\n', patch_text)
+                self.assertIn('+    raise ImportError(\n', patch_text)
+                self.assertIn('+    ) from e\n', patch_text)
+                self.assertNotIn('warnings.warn', patch_text)
+                self.assertIn('https://michael-denyer.github.io/numpy-mkl', patch_text)
 
 
 class TestPackageSetPlan(unittest.TestCase):

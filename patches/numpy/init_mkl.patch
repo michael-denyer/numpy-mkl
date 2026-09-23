@@ -2,18 +2,17 @@ diff --git a/numpy/_distributor_init.py b/numpy/_distributor_init.py
 index 25b0eed7..76152e93 100644
 --- a/numpy/_distributor_init.py
 +++ b/numpy/_distributor_init.py
-@@ -13,3 +13,14 @@
+@@ -13,3 +13,13 @@
      from . import _distributor_init_local  # noqa: F401
  except ImportError:
      pass
 +
 +try:
 +    import mkl
-+except ImportError:
-+    import warnings
-+
-+    warnings.warn(
-+        "Failed to import mkl-service. Please install it or manually add the MKL "
-+        "library to LD_LIBRARY_PATH.",
-+        stacklevel=2,
-+    )
++except ImportError as e:
++    raise ImportError(
++        "numpy from https://michael-denyer.github.io/numpy-mkl links the MKL "
++        "ILP64 and Intel OpenMP runtimes and vendors neither: install 'mkl' "
++        "(which pulls in 'intel-openmp') and 'mkl-service' from that index "
++        "before importing numpy."
++    ) from e

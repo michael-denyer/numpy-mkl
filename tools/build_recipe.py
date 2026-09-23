@@ -13,6 +13,7 @@ COMMON_FILES = (
     'pyproject.toml',
     'uv.lock',
     'tools/build_recipe.py',
+    'tools/check_vendored_runtime.py',
     'tools/fetch_matrix2',
     'tools/get_file_in_pkg',
     'tools/package_set_plan.py',
