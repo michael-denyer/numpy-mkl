@@ -330,6 +330,12 @@ jobs:
               --exclude "mkl_*.dll" --exclude libsf_error_state.dll
         if: runner.os == 'Windows'
 
+      - name: Check vendored runtime libraries
+        run: |
+          # One MKL stack and one OpenMP runtime per process: both come from the
+          # mkl and intel-openmp packages, never from <package>.libs.
+          uv run --locked python tools/check_vendored_runtime.py wheelhouse/*.whl
+
       - name: Download same-run dependency wheels
         if: inputs.name != 'mkl-service'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
