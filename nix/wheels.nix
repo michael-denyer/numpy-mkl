@@ -22,13 +22,13 @@
     };
     mkl-service = {
       version = "2.8.0";
-      url = "https://github.com/michael-denyer/numpy-mkl/releases/download/0.3.17/mkl_service-2.8.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl";
-      hash = "sha256-xwvqagA9wB07ArQ0KI4LAmkhIOdARz7BXCXkrhpu14o=";
+      url = "https://github.com/michael-denyer/numpy-mkl/releases/download/0.3.18/mkl_service-2.8.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl";
+      hash = "sha256-Fte099HIGWi+nyO+A+NCLzmr07li1Xro07iAfoLs54M=";
     };
     numpy = {
       version = "2.5.3";
-      url = "https://github.com/michael-denyer/numpy-mkl/releases/download/0.3.16/numpy-2.5.3-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl";
-      hash = "sha256-64MeImTBaLmvIStVki7itlG8ylLZ7htPhFDO66ZDv0A=";
+      url = "https://github.com/michael-denyer/numpy-mkl/releases/download/0.3.18/numpy-2.5.3-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl";
+      hash = "sha256-dvstTE8L1Zyycc1wcW0+sYGxTYOABd1MqqFeypoVWSc=";
     };
     onemkl-license = {
       version = "2026.1.0";
@@ -37,8 +37,8 @@
     };
     scipy = {
       version = "1.18.1";
-      url = "https://github.com/michael-denyer/numpy-mkl/releases/download/0.3.17/scipy-1.18.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl";
-      hash = "sha256-Fo/NC69uUawoeSReJU8S1H1CDMT66jVsCFhnSEVc2/o=";
+      url = "https://github.com/michael-denyer/numpy-mkl/releases/download/0.3.18/scipy-1.18.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl";
+      hash = "sha256-eUqPyJA6KRtmu4BDxgcbJdFUxHAGooR4G4ck+YxwPlE=";
     };
     tbb = {
       version = "2023.1.0";
@@ -74,13 +74,13 @@
     };
     mkl-service = {
       version = "2.8.0";
-      url = "https://github.com/michael-denyer/numpy-mkl/releases/download/0.3.17/mkl_service-2.8.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl";
-      hash = "sha256-9lmB9yNZjwgKKTNMrUzZBxM0DIQmrFNnUjHD+o70E8g=";
+      url = "https://github.com/michael-denyer/numpy-mkl/releases/download/0.3.18/mkl_service-2.8.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl";
+      hash = "sha256-43YqM/7pJM/KzAMOOALvYgOJhoRcWTMNkATnOmvGlqc=";
     };
     numpy = {
       version = "2.5.3";
-      url = "https://github.com/michael-denyer/numpy-mkl/releases/download/0.3.16/numpy-2.5.3-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl";
-      hash = "sha256-dU5j5STC1SuhB6QCZm6GXwszTz+C2Mz4BmGE67XbUPs=";
+      url = "https://github.com/michael-denyer/numpy-mkl/releases/download/0.3.18/numpy-2.5.3-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl";
+      hash = "sha256-fG7r4qgAyywYGGXB28smZ4HBN2OY2+uRvJ3UFUs3OZ4=";
     };
     onemkl-license = {
       version = "2026.1.0";
@@ -89,8 +89,8 @@
     };
     scipy = {
       version = "1.18.1";
-      url = "https://github.com/michael-denyer/numpy-mkl/releases/download/0.3.17/scipy-1.18.1-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl";
-      hash = "sha256-ySGv7GDWI5aBT2PHlpsNoj+byDUGeXi5J7XI1R3LHgQ=";
+      url = "https://github.com/michael-denyer/numpy-mkl/releases/download/0.3.18/scipy-1.18.1-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl";
+      hash = "sha256-3jAenBYz2BSS6a7RBDHjyHLRQDK9wjA5Ay4W56p1uuQ=";
     };
     tbb = {
       version = "2023.1.0";
@@ -126,13 +126,13 @@
     };
     mkl-service = {
       version = "2.8.0";
-      url = "https://github.com/michael-denyer/numpy-mkl/releases/download/0.3.17/mkl_service-2.8.0-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl";
-      hash = "sha256-WjI1+sDY5Vf3WZlYLEE+RAwPDzixWl2XOvvqlix2pQA=";
+      url = "https://github.com/michael-denyer/numpy-mkl/releases/download/0.3.18/mkl_service-2.8.0-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl";
+      hash = "sha256-VGgv9CgtUMHn/uRGLsiIJTBrf7FvimVWHEabblNXTqQ=";
     };
     numpy = {
       version = "2.5.3";
-      url = "https://github.com/michael-denyer/numpy-mkl/releases/download/0.3.16/numpy-2.5.3-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl";
-      hash = "sha256-Le+QWb8C9C2aF8QKCLwBN8xewMJ9tchjOa+UlxhcZVU=";
+      url = "https://github.com/michael-denyer/numpy-mkl/releases/download/0.3.18/numpy-2.5.3-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl";
+      hash = "sha256-rSU21ivBDc3CwYN3+WAjOxB3N4MsY6AztNFdHkyjplg=";
     };
     onemkl-license = {
       version = "2026.1.0";
@@ -141,8 +141,8 @@
     };
     scipy = {
       version = "1.18.1";
-      url = "https://github.com/michael-denyer/numpy-mkl/releases/download/0.3.17/scipy-1.18.1-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl";
-      hash = "sha256-Shaaz5F/yLFRTVoeLitLydBkF4/XnCFcinppg/0FBUI=";
+      url = "https://github.com/michael-denyer/numpy-mkl/releases/download/0.3.18/scipy-1.18.1-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl";
+      hash = "sha256-8qtPEKhS4b5iD3IXnGo4Z9p1EVXEJYgFAboaCK+ufVE=";
     };
     tbb = {
       version = "2023.1.0";
