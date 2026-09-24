@@ -98,6 +98,12 @@ capture LP64 calls. `tools/check_vendored_runtime.py` fails the build if a wheel
 MKL, OpenMP or TBB runtime library: two OpenMP runtimes in one process tear down against each
 other at exit.
 
+Only numpy 2.5.3 (release 0.3.18) and 2.4.6 for Python 3.12 to 3.14 (release 0.3.17) are built
+this way. Every older Linux numpy wheel on the index, including 2.4.6 for Python 3.11, bundles
+its own `numpy.libs/libiomp5` and can crash with a segfault at interpreter exit. The Python 3.11
+wheel cannot be rebuilt because SciPy 1.18 has no Python 3.11 build. Use Python 3.12 or later
+and the current numpy.
+
 Vendoring the direct libraries is not a substitute. `auditwheel` copies only link-time libraries,
 while MKL loads its compute kernels (`libmkl_def`, `libmkl_avx2`, `libmkl_avx512`) at runtime from
 the `mkl` package.
