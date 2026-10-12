@@ -551,6 +551,39 @@ class TestDistributorInitPatches(unittest.TestCase):
                 self.assertNotIn('warnings.warn', patch_text)
                 self.assertIn('https://michael-denyer.github.io/numpy-mkl', patch_text)
 
+    @staticmethod
+    def run_added_lines(package, import_error):
+        patch_text = (ROOT / 'patches' / package / 'init_mkl.patch').read_text()
+        added = ''.join(
+            line[1:]
+            for line in patch_text.splitlines(keepends=True)
+            if line.startswith('+') and not line.startswith('+++')
+        )
+        with patch('builtins.__import__', side_effect=import_error):
+            exec(added, {})
+
+    def test_missing_mkl_service_points_at_the_index(self):
+        for package in ('numpy', 'scipy'):
+            with self.subTest(package=package):
+                with self.assertRaises(ImportError) as raised:
+                    self.run_added_lines(
+                        package,
+                        ModuleNotFoundError("No module named 'mkl'", name='mkl'),
+                    )
+                self.assertIn(
+                    "install 'mkl' (which pulls in 'intel-openmp') and 'mkl-service'",
+                    str(raised.exception),
+                )
+
+    def test_installed_mkl_service_import_error_keeps_its_message(self):
+        # CPython raises this when an isolated subinterpreter imports mkl-service.
+        message = 'module _mklinit does not support loading in subinterpreters'
+        for package in ('numpy', 'scipy'):
+            with self.subTest(package=package):
+                with self.assertRaises(ImportError) as raised:
+                    self.run_added_lines(package, ImportError(message))
+                self.assertEqual(str(raised.exception), message)
+
 
 class TestPackageSetPlan(unittest.TestCase):
     @staticmethod
