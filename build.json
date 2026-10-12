@@ -209,6 +209,30 @@
     "mkl": "2026.1.0",
     "recipe": "sha256:59765913f8672e52b8d42584da581f2c52d4068c904c217a5d1c535c2f2b322b"
   },
+  "mkl_service-2.9.0-cp312-linux": {
+    "mkl": "2026.1.0",
+    "recipe": "sha256:101f322bc0927ccd86097b150828d282d76c994ef91f58f3b3081f6182187c84"
+  },
+  "mkl_service-2.9.0-cp312-windows": {
+    "mkl": "2026.1.0",
+    "recipe": "sha256:9c1b771074f2ca87743f87fef4120bedd8f719431dbcabd3715acce63be93813"
+  },
+  "mkl_service-2.9.0-cp313-linux": {
+    "mkl": "2026.1.0",
+    "recipe": "sha256:101f322bc0927ccd86097b150828d282d76c994ef91f58f3b3081f6182187c84"
+  },
+  "mkl_service-2.9.0-cp313-windows": {
+    "mkl": "2026.1.0",
+    "recipe": "sha256:9c1b771074f2ca87743f87fef4120bedd8f719431dbcabd3715acce63be93813"
+  },
+  "mkl_service-2.9.0-cp314-linux": {
+    "mkl": "2026.1.0",
+    "recipe": "sha256:101f322bc0927ccd86097b150828d282d76c994ef91f58f3b3081f6182187c84"
+  },
+  "mkl_service-2.9.0-cp314-windows": {
+    "mkl": "2026.1.0",
+    "recipe": "sha256:9c1b771074f2ca87743f87fef4120bedd8f719431dbcabd3715acce63be93813"
+  },
   "numpy-2.1.3-cp310-linux": {
     "mkl": "2025.1.0"
   },
@@ -683,6 +707,30 @@
     "mkl": "2026.1.0",
     "recipe": "sha256:68deced9117ba185edb490e9ef429386179be6c3da145faed35d1ce6b0316612"
   },
+  "numpy-2.5.4-cp312-linux": {
+    "mkl": "2026.1.0",
+    "recipe": "sha256:d5afa8fcc93dd4beb9b6f4510ea958ae0cade436fc0e8c3bef5359bc0c264b75"
+  },
+  "numpy-2.5.4-cp312-windows": {
+    "mkl": "2026.1.0",
+    "recipe": "sha256:75256deace1eefa237c38b42ff372855a1e3a86b9195e4f070705dc612084cea"
+  },
+  "numpy-2.5.4-cp313-linux": {
+    "mkl": "2026.1.0",
+    "recipe": "sha256:d5afa8fcc93dd4beb9b6f4510ea958ae0cade436fc0e8c3bef5359bc0c264b75"
+  },
+  "numpy-2.5.4-cp313-windows": {
+    "mkl": "2026.1.0",
+    "recipe": "sha256:75256deace1eefa237c38b42ff372855a1e3a86b9195e4f070705dc612084cea"
+  },
+  "numpy-2.5.4-cp314-linux": {
+    "mkl": "2026.1.0",
+    "recipe": "sha256:d5afa8fcc93dd4beb9b6f4510ea958ae0cade436fc0e8c3bef5359bc0c264b75"
+  },
+  "numpy-2.5.4-cp314-windows": {
+    "mkl": "2026.1.0",
+    "recipe": "sha256:75256deace1eefa237c38b42ff372855a1e3a86b9195e4f070705dc612084cea"
+  },
   "scipy-1.15.2-cp310-linux": {
     "mkl": "2025.1.0"
   },
@@ -883,26 +931,26 @@
   },
   "scipy-1.18.1-cp312-linux": {
     "mkl": "2026.1.0",
-    "recipe": "sha256:2d775d4a3349ef68ffc2fcb9175a8d01b100aaff2a05329ea430d0210d093e2f"
+    "recipe": "sha256:df6220df2a0681b19fb63ae24b5f30c7a1a9f9368e0d4c38d5a55dc9f1e7f3bb"
   },
   "scipy-1.18.1-cp312-windows": {
     "mkl": "2026.1.0",
-    "recipe": "sha256:9bf69feaa8c2f3f4d10c2f40b94aafd70e0c4c15aa038698838a4b809d14b241"
+    "recipe": "sha256:1c10163aa713f379f72d4fc813562fba4cd9bac3164f92b7c83b2e67ccb14834"
   },
   "scipy-1.18.1-cp313-linux": {
     "mkl": "2026.1.0",
-    "recipe": "sha256:2d775d4a3349ef68ffc2fcb9175a8d01b100aaff2a05329ea430d0210d093e2f"
+    "recipe": "sha256:df6220df2a0681b19fb63ae24b5f30c7a1a9f9368e0d4c38d5a55dc9f1e7f3bb"
   },
   "scipy-1.18.1-cp313-windows": {
     "mkl": "2026.1.0",
-    "recipe": "sha256:9bf69feaa8c2f3f4d10c2f40b94aafd70e0c4c15aa038698838a4b809d14b241"
+    "recipe": "sha256:1c10163aa713f379f72d4fc813562fba4cd9bac3164f92b7c83b2e67ccb14834"
   },
   "scipy-1.18.1-cp314-linux": {
     "mkl": "2026.1.0",
-    "recipe": "sha256:2d775d4a3349ef68ffc2fcb9175a8d01b100aaff2a05329ea430d0210d093e2f"
+    "recipe": "sha256:df6220df2a0681b19fb63ae24b5f30c7a1a9f9368e0d4c38d5a55dc9f1e7f3bb"
   },
   "scipy-1.18.1-cp314-windows": {
     "mkl": "2026.1.0",
-    "recipe": "sha256:9bf69feaa8c2f3f4d10c2f40b94aafd70e0c4c15aa038698838a4b809d14b241"
+    "recipe": "sha256:1c10163aa713f379f72d4fc813562fba4cd9bac3164f92b7c83b2e67ccb14834"
   }
 }
