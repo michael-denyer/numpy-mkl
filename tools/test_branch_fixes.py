@@ -545,7 +545,7 @@ class TestDistributorInitPatches(unittest.TestCase):
             with self.subTest(package=package):
                 patch_text = (ROOT / 'patches' / package / 'init_mkl.patch').read_text()
                 self.assertIn('+    import mkl\n', patch_text)
-                self.assertIn('+except ImportError as e:\n', patch_text)
+                self.assertIn('+except ModuleNotFoundError as e:\n', patch_text)
                 self.assertIn('+    raise ImportError(\n', patch_text)
                 self.assertIn('+    ) from e\n', patch_text)
                 self.assertNotIn('warnings.warn', patch_text)

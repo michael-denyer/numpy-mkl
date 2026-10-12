@@ -9,7 +9,7 @@ index 5df13497..67866a5b 100644
 +
 +try:
 +    import mkl
-+except ImportError as e:
++except ModuleNotFoundError as e:
 +    raise ImportError(
 +        "scipy from https://michael-denyer.github.io/numpy-mkl links the MKL "
 +        "runtime and vendors no copy of it: install 'mkl' (which pulls in "
