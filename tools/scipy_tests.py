@@ -71,7 +71,25 @@ if __name__ == '__main__':
         case 'Linux':
             # test_support_moments_sample: MKL computes a Normal moment as exact
             # 0.0 vs ~3e-9, just exceeding the atol=2e-09 tolerance.
-            extra_args += ['-k', 'not test_support_moments_sample']
+            # The rest fail since MKL 2026.2.0 on some runners: they compare two
+            # code paths for the same problem, and MKL no longer returns
+            # identical results across them. cossin: singular vectors come
+            # back with flipped signs depending on compute_u/compute_vh/separate
+            # (both valid; the reconstruction checks pass). rgi cubic: the
+            # iterative spline solve lands ~1e-6 apart. descending_points_nd,
+            # expm_cond: 1 ulp under exact-equality asserts. A '[' suffix
+            # matches only the parametrized test, not test_cossin_error_* or
+            # test_nonscalar_values_2.
+            skips = [
+                'test_support_moments_sample',
+                'test_cossin[',
+                'test_cossin_separate',
+                '(test_decomp_cossin and test_properties)',
+                'test_nonscalar_values[cubic]',
+                'test_descending_points_nd',
+                '(TestBatch and test_expm_cond)',
+            ]
+            extra_args += ['-k', ' and '.join(f'not {s}' for s in skips)]
 
     passed = scipy.test(extra_argv=extra_args or None)
     finish_test_process(passed, runner_os)
