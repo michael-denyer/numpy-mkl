@@ -14,6 +14,49 @@ def finish_test_process(passed, runner_os):
     sys.exit(not passed)
 
 
+def cossin_reconstructs():
+    """Check that cossin factors are unitary and reproduce their input.
+
+    Keeps the reconstruction asserts of SciPy's test_cossin, which the Linux
+    -k filter skips along with its cross-path comparisons. Same seed, sizes
+    and tolerance as the upstream test.
+
+    Returns:
+        True if every case passes; failures are printed.
+    """
+    # Lazy: test_branch_fixes loads this module without numpy or scipy.
+    import numpy as np  # noqa: PLC0415
+    from scipy.linalg import cossin  # noqa: PLC0415
+    from scipy.stats import ortho_group, unitary_group  # noqa: PLC0415
+
+    rng = np.random.default_rng(1708093570726217)
+    passed = True
+    for dtype, group in ((np.float64, ortho_group), (np.complex128, unitary_group)):
+        for m, p, q in ((40, 12, 20), (100, 50, 50)):
+            x = np.asarray(group.rvs(m, random_state=rng), dtype=dtype)
+            blocks = [x[:p, :q], x[:p, q:], x[p:, :q], x[p:, q:]]
+            atol = m * 1e3 * np.finfo(dtype).eps
+            eye = np.eye(m)
+            for swap_sign in (False, True):
+                for source, args in (('matrix', (x, p, q)), ('blocks', (blocks,))):
+                    u, cs, vh = cossin(*args, swap_sign=swap_sign)
+                    errors = {
+                        'x - u @ cs @ vh': np.abs(x - u @ cs @ vh).max(),
+                        'u unitary': np.abs(u @ u.conj().T - eye).max(),
+                        'vh unitary': np.abs(vh @ vh.conj().T - eye).max(),
+                    }
+                    for check, err in errors.items():
+                        if not err <= atol:
+                            passed = False
+                            print(
+                                f'cossin {dtype.__name__} m={m} p={p} q={q} '
+                                f'{source} swap_sign={swap_sign}: {check} '
+                                f'max error {err:.3e} > {atol:.3e}'
+                            )
+    print(f'cossin reconstruction: {"passed" if passed else "FAILED"}')
+    return passed
+
+
 # Guard required: on Windows multiprocessing.Pool uses 'spawn', which reimports
 # __main__ in each worker. Without this guard the workers would re-execute
 # scipy.test(), causing recursive test runs and a deadlock in test_pool.
@@ -71,7 +114,28 @@ if __name__ == '__main__':
         case 'Linux':
             # test_support_moments_sample: MKL computes a Normal moment as exact
             # 0.0 vs ~3e-9, just exceeding the atol=2e-09 tolerance.
-            extra_args += ['-k', 'not test_support_moments_sample']
+            # The rest fail since MKL 2026.2.0 on some runners: they compare two
+            # code paths for the same problem, and MKL no longer returns
+            # identical results across them. cossin: singular vectors come
+            # back with flipped signs depending on compute_u/compute_vh/separate
+            # (both valid; the reconstruction checks pass). rgi cubic: the
+            # iterative spline solve lands ~1e-6 apart. descending_points_nd,
+            # expm_cond: 1 ulp under exact-equality asserts. A '[' suffix
+            # matches only the parametrized test, not test_cossin_error_* or
+            # test_nonscalar_values_2.
+            skips = [
+                'test_support_moments_sample',
+                'test_cossin[',
+                'test_cossin_separate',
+                '(test_decomp_cossin and test_properties)',
+                'test_nonscalar_values[cubic]',
+                'test_descending_points_nd',
+                '(TestBatch and test_expm_cond)',
+            ]
+            extra_args += ['-k', ' and '.join(f'not {s}' for s in skips)]
 
     passed = scipy.test(extra_argv=extra_args or None)
+    # After the suite: generating the inputs initializes MKL threads, which
+    # must not happen before test_pool forks (see -k note above).
+    passed = cossin_reconstructs() and passed
     finish_test_process(passed, runner_os)
