@@ -211,27 +211,27 @@
   },
   "mkl_service-2.9.0-cp312-linux": {
     "mkl": "2026.2.0",
-    "recipe": "sha256:38d575f254ed70fd5e45c744fa208f503a6245296253458339c53ea71d28acb6"
+    "recipe": "sha256:33a42e445135703b5aa3155078fdd78d9f88600bbe9babe0097773b41e64f224"
   },
   "mkl_service-2.9.0-cp312-windows": {
     "mkl": "2026.2.0",
-    "recipe": "sha256:fd9b2e15f096ee7ae69da99149591e4f2d1328ff30826925ee923715cd18a732"
+    "recipe": "sha256:792a28079b2a7d00b9c6c74443749595492cee95f171a8d2c012131ff731b62e"
   },
   "mkl_service-2.9.0-cp313-linux": {
     "mkl": "2026.2.0",
-    "recipe": "sha256:38d575f254ed70fd5e45c744fa208f503a6245296253458339c53ea71d28acb6"
+    "recipe": "sha256:33a42e445135703b5aa3155078fdd78d9f88600bbe9babe0097773b41e64f224"
   },
   "mkl_service-2.9.0-cp313-windows": {
     "mkl": "2026.2.0",
-    "recipe": "sha256:fd9b2e15f096ee7ae69da99149591e4f2d1328ff30826925ee923715cd18a732"
+    "recipe": "sha256:792a28079b2a7d00b9c6c74443749595492cee95f171a8d2c012131ff731b62e"
   },
   "mkl_service-2.9.0-cp314-linux": {
     "mkl": "2026.2.0",
-    "recipe": "sha256:38d575f254ed70fd5e45c744fa208f503a6245296253458339c53ea71d28acb6"
+    "recipe": "sha256:33a42e445135703b5aa3155078fdd78d9f88600bbe9babe0097773b41e64f224"
   },
   "mkl_service-2.9.0-cp314-windows": {
     "mkl": "2026.2.0",
-    "recipe": "sha256:fd9b2e15f096ee7ae69da99149591e4f2d1328ff30826925ee923715cd18a732"
+    "recipe": "sha256:792a28079b2a7d00b9c6c74443749595492cee95f171a8d2c012131ff731b62e"
   },
   "numpy-2.1.3-cp310-linux": {
     "mkl": "2025.1.0"
@@ -709,27 +709,27 @@
   },
   "numpy-2.5.4-cp312-linux": {
     "mkl": "2026.2.0",
-    "recipe": "sha256:e68bb9a5439a0796b2993475d15c2f017c4264c9d5c953e5379f3dd8c3b46045"
+    "recipe": "sha256:10f4e845290256af4a9429420a3fd2918046726d3d1d5277a9ca0e6b3450695c"
   },
   "numpy-2.5.4-cp312-windows": {
     "mkl": "2026.2.0",
-    "recipe": "sha256:84079c75b5bd05421344e0eca2cd5a8a3557f0ce085eec5d7cc58f70f193f8ef"
+    "recipe": "sha256:8740d1c7a3a55e279e08c2a89adc2f769e3401d6436b0500132d02302f9ba059"
   },
   "numpy-2.5.4-cp313-linux": {
     "mkl": "2026.2.0",
-    "recipe": "sha256:e68bb9a5439a0796b2993475d15c2f017c4264c9d5c953e5379f3dd8c3b46045"
+    "recipe": "sha256:10f4e845290256af4a9429420a3fd2918046726d3d1d5277a9ca0e6b3450695c"
   },
   "numpy-2.5.4-cp313-windows": {
     "mkl": "2026.2.0",
-    "recipe": "sha256:84079c75b5bd05421344e0eca2cd5a8a3557f0ce085eec5d7cc58f70f193f8ef"
+    "recipe": "sha256:8740d1c7a3a55e279e08c2a89adc2f769e3401d6436b0500132d02302f9ba059"
   },
   "numpy-2.5.4-cp314-linux": {
     "mkl": "2026.2.0",
-    "recipe": "sha256:e68bb9a5439a0796b2993475d15c2f017c4264c9d5c953e5379f3dd8c3b46045"
+    "recipe": "sha256:10f4e845290256af4a9429420a3fd2918046726d3d1d5277a9ca0e6b3450695c"
   },
   "numpy-2.5.4-cp314-windows": {
     "mkl": "2026.2.0",
-    "recipe": "sha256:84079c75b5bd05421344e0eca2cd5a8a3557f0ce085eec5d7cc58f70f193f8ef"
+    "recipe": "sha256:8740d1c7a3a55e279e08c2a89adc2f769e3401d6436b0500132d02302f9ba059"
   },
   "scipy-1.15.2-cp310-linux": {
     "mkl": "2025.1.0"
@@ -931,26 +931,26 @@
   },
   "scipy-1.18.1-cp312-linux": {
     "mkl": "2026.2.0",
-    "recipe": "sha256:ebf43d1e514e61ac64217769ee246c65e8e37aadee649150201e4eea6892b2de"
+    "recipe": "sha256:ec06cfd377d4a664d3e3673fdeb88418e13dcc45f7ee676415e4b7def571b6a6"
   },
   "scipy-1.18.1-cp312-windows": {
     "mkl": "2026.2.0",
-    "recipe": "sha256:231a5dbc5be3507cb55f10332c20fbd821aa7af780cb81714cf81fe0d91aa471"
+    "recipe": "sha256:d1c32280d0cecbeebbceb866f04e7ff4ac07b8d4df556eaf9d91058f5fdd035c"
   },
   "scipy-1.18.1-cp313-linux": {
     "mkl": "2026.2.0",
-    "recipe": "sha256:ebf43d1e514e61ac64217769ee246c65e8e37aadee649150201e4eea6892b2de"
+    "recipe": "sha256:ec06cfd377d4a664d3e3673fdeb88418e13dcc45f7ee676415e4b7def571b6a6"
   },
   "scipy-1.18.1-cp313-windows": {
     "mkl": "2026.2.0",
-    "recipe": "sha256:231a5dbc5be3507cb55f10332c20fbd821aa7af780cb81714cf81fe0d91aa471"
+    "recipe": "sha256:d1c32280d0cecbeebbceb866f04e7ff4ac07b8d4df556eaf9d91058f5fdd035c"
   },
   "scipy-1.18.1-cp314-linux": {
     "mkl": "2026.2.0",
-    "recipe": "sha256:ebf43d1e514e61ac64217769ee246c65e8e37aadee649150201e4eea6892b2de"
+    "recipe": "sha256:ec06cfd377d4a664d3e3673fdeb88418e13dcc45f7ee676415e4b7def571b6a6"
   },
   "scipy-1.18.1-cp314-windows": {
     "mkl": "2026.2.0",
-    "recipe": "sha256:231a5dbc5be3507cb55f10332c20fbd821aa7af780cb81714cf81fe0d91aa471"
+    "recipe": "sha256:d1c32280d0cecbeebbceb866f04e7ff4ac07b8d4df556eaf9d91058f5fdd035c"
   }
 }
