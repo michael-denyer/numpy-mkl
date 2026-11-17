@@ -17,7 +17,7 @@ def finish_test_process(passed, runner_os):
 def cossin_reconstructs():
     """Check that cossin factors are unitary and reproduce their input.
 
-    Keeps the reconstruction asserts of SciPy's test_cossin, which the Linux
+    Keeps the reconstruction asserts of SciPy's test_cossin, which the
     -k filter skips along with its cross-path comparisons. Same seed, sizes
     and tolerance as the upstream test.
 
@@ -99,42 +99,28 @@ if __name__ == '__main__':
     # Use -k (name-based filter) rather than --deselect (path-based): passing
     # --deselect with a scipy/ path triggers early path resolution by pytest,
     # which initializes MKL threads before test_pool's fork() and deadlocks.
-    extra_args = []
+    # With MKL 2026.2, equivalent cossin calls can choose opposite signs for
+    # singular vectors. The reconstruction checks below accept either sign.
+    # The cubic spline solves can differ by ~1e-6 when solving multiple RHS.
+    # Reversing spline grid axes or batching expm_cond can change rounding
+    # under exact-equality assertions.
+    skips = [
+        'test_cossin[',
+        'test_cossin_separate',
+        '(test_decomp_cossin and test_properties)',
+        'test_nonscalar_values[cubic]',
+        '(test_descending_points_nd and (slinear] or cubic] or quintic]))',
+        '(TestBatch and test_expm_cond)',
+    ]
+    if runner_os == 'Windows':
+        # MKL's sin/cos range reduction affects j0 for large arguments and
+        # cancellation in the two sph_harm_y recurrences.
+        skips.extend(['test_gh22705', 'TestSphHarm'])
+    else:
+        # MKL computes a Normal moment as exact 0.0 vs ~3e-9 (atol=2e-9).
+        skips.append('test_support_moments_sample')
 
-    match os.environ.get('RUNNER_OS'):
-        case 'Windows':
-            # test_gh22705: j0 for large arguments; MKL intercepts sin/cos at
-            # runtime and its range reduction for x=1e15/1e30 doesn't meet the
-            # rtol=5e-15 tolerance.
-            # TestSphHarm: sph_harm_y_all and sph_harm_y disagree by up to 3e-4
-            # relative on values of order 1e-20, where the two recurrences and
-            # MKL's sin/cos cancel differently. Filter on the class rather than
-            # test_all, which as a substring would match unrelated tests.
-            extra_args += ['-k', 'not test_gh22705 and not TestSphHarm']
-        case 'Linux':
-            # test_support_moments_sample: MKL computes a Normal moment as exact
-            # 0.0 vs ~3e-9, just exceeding the atol=2e-09 tolerance.
-            # The rest fail since MKL 2026.2.0 on some runners: they compare two
-            # code paths for the same problem, and MKL no longer returns
-            # identical results across them. cossin: singular vectors come
-            # back with flipped signs depending on compute_u/compute_vh/separate
-            # (both valid; the reconstruction checks pass). rgi cubic: the
-            # iterative spline solve lands ~1e-6 apart. descending_points_nd,
-            # expm_cond: 1 ulp under exact-equality asserts. A '[' suffix
-            # matches only the parametrized test, not test_cossin_error_* or
-            # test_nonscalar_values_2.
-            skips = [
-                'test_support_moments_sample',
-                'test_cossin[',
-                'test_cossin_separate',
-                '(test_decomp_cossin and test_properties)',
-                'test_nonscalar_values[cubic]',
-                'test_descending_points_nd',
-                '(TestBatch and test_expm_cond)',
-            ]
-            extra_args += ['-k', ' and '.join(f'not {s}' for s in skips)]
-
-    passed = scipy.test(extra_argv=extra_args or None)
+    passed = scipy.test(extra_argv=['-k', ' and '.join(f'not {s}' for s in skips)])
     # After the suite: generating the inputs initializes MKL threads, which
     # must not happen before test_pool forks (see -k note above).
     passed = cossin_reconstructs() and passed
