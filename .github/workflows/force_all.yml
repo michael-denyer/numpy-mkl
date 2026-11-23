@@ -1,25 +1,38 @@
 name: Rebuild all
 
+# Rebuilds the matched set for the selected Python versions, for example:
+#   gh workflow run force_all.yml -f python-versions="3.15 3.15t"
 on:
   workflow_dispatch:
+    inputs:
+      python-versions:
+        type: string
+        default: ""
+        description: "Python versions to rebuild, e.g. '3.15 3.15t' (default: from ci-targets.yaml)"
+      dry-run:
+        type: boolean
+        default: false
+        description: "Build and test only, skipping the release (wheels are kept as artifacts)"
 
 permissions: {}
 
 jobs:
   verify:
-    if: ${{ github.ref != 'refs/heads/main' }}
+    if: ${{ github.ref != 'refs/heads/main' || inputs.dry-run }}
     permissions:
       contents: write
     uses: ./.github/workflows/package_set.yml
     with:
       force-build: true
       publish: false
+      python-versions: ${{ inputs.python-versions }}
 
   publish:
-    if: ${{ github.ref == 'refs/heads/main' }}
+    if: ${{ github.ref == 'refs/heads/main' && !inputs.dry-run }}
     permissions:
       contents: write
     uses: ./.github/workflows/package_set.yml
     with:
       force-build: true
       publish: true
+      python-versions: ${{ inputs.python-versions }}

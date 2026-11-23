@@ -58,6 +58,7 @@ jobs:
           EXPECT_NUMPY_ILP64: ${{ matrix.numpy_ilp64 }}
           EXPECT_SCIPY_ILP64: ${{ matrix.scipy_ilp64 }}
           POLICY_RUNNER_OS: ${{ matrix.os }}
+          PYTHON_TAG: ${{ matrix.python_version }}
         run: |
           shopt -s nullglob
           mkl_service_wheels=(artifacts/mkl-service/*.whl)
@@ -92,3 +93,6 @@ jobs:
             --numpy "${numpy_wheels[0]}" \
             --scipy "${scipy_wheels[0]}" \
             --runner-os "$POLICY_RUNNER_OS"
+          if [[ "$PYTHON_TAG" == *t ]]; then
+            python tools/check_gil mkl numpy scipy
+          fi

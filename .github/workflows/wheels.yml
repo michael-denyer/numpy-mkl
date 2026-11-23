@@ -67,6 +67,8 @@ jobs:
         run: |
           # Need this since pyproject.toml doesn't apply to $SRC_DIR.
           echo "UV_PYTHON_PREFERENCE=only-managed" >>$GITHUB_ENV
+          # Retry transient errors when fetching build and runtime dependencies.
+          echo "UV_HTTP_RETRIES=10" >>$GITHUB_ENV
 
           # Move src to avoid pyproject conflicts.
           mv src ../../ && echo "SRC_DIR=${GITHUB_WORKSPACE}/../../src" >>$GITHUB_ENV
@@ -95,6 +97,19 @@ jobs:
           python-version: ${{ matrix.python_version }}
           version-file: "pyproject.toml"
           enable-cache: false
+
+      - name: Check python version
+        run: |
+          uv run --no-project python - "$PYTHON_TAG" <<'PY'
+          import sys
+          import sysconfig
+
+          actual = f'cp{sys.version_info.major}{sys.version_info.minor}'
+          if sysconfig.get_config_var('Py_GIL_DISABLED'):
+              actual += 't'
+          if actual != sys.argv[1] or sys.version_info.releaselevel != 'final':
+              sys.exit(f'Expected final {sys.argv[1]}, got {actual} ({sys.version})')
+          PY
 
       - name: Install MKL libraries
         run: |
