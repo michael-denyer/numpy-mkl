@@ -103,8 +103,7 @@ jobs:
                 system = "x86_64-linux";
                 overlays = [ flake.overlays.default ];
               };
-              inherit (pkgs) lib;
-              attrFor = version: "python" + lib.replaceStrings [ "." ] [ "" ] version;
+              inherit (import ./nix/lib.nix { inherit (pkgs) lib; }) attrFor;
               envFor =
                 version:
                 (pkgs.${attrFor version}.withPackages (ps: [
@@ -122,11 +121,13 @@ jobs:
               exit 0
           fi
 
-          # Numpy only warns when mkl-service is missing, so import mkl
-          # directly. Solving an eigenproblem confirms mkl itself is loadable.
+          # Import mkl and solve an eigenproblem to confirm MKL is loadable. On
+          # free-threaded builds, also fail if any extension re-enabled the GIL.
           check='
-          import mkl, numpy, scipy.linalg
+          import sys, sysconfig, mkl, numpy, scipy.linalg
           scipy.linalg.eigh(numpy.eye(4))
+          if sysconfig.get_config_var("Py_GIL_DISABLED") and sys._is_gil_enabled():
+              sys.exit("an extension module re-enabled the GIL")
           print(numpy.__version__, scipy.__version__, mkl.get_version_string())
           '
 
@@ -141,8 +142,9 @@ jobs:
                     system = \"x86_64-linux\";
                     overlays = [ flake.overlays.default ];
                   };
+                  inherit (import ./nix/lib.nix { inherit (pkgs) lib; }) attrFor;
                 in
-                pkgs.python${version//./}.withPackages (ps: [ ps.numpy ps.scipy ])")
+                pkgs.\${attrFor \"$version\"}.withPackages (ps: [ ps.numpy ps.scipy ])")
               "$env/bin/python" -c "$check"
               echo "::endgroup::"
           done
@@ -165,4 +167,9 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add .
           git commit -m "ci: Update nix derivations"
+
+          # Main is checked out minutes before this push, so a release or merge may have landed
+          # in the meantime. Releases don't touch the files committed here, so rebase on top;
+          # in the rare case of a real conflict, this fails and the next run retries.
+          git pull --rebase origin main
           git push origin HEAD:main

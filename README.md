@@ -5,7 +5,7 @@
 **ILP64 Fork** - This fork builds NumPy with MKL's **ILP64 (64-bit integer)** interface,
 enabling eigendecomposition of matrices larger than 46k x 46k (the LP64 limit).
 
-> **Upstream**: [urob/numpy-mkl](https://github.com/urob/numpy-mkl) (LP64 version)
+> **Upstream**: [urob/numpy-mkl](https://github.com/urob/numpy-mkl)
 
 This repository provides binary wheels for NumPy and SciPy, linked to Intel's high-performance
 [oneAPI Math Kernel

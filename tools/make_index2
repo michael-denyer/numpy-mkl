@@ -4,6 +4,7 @@ import argparse
 import os
 import re
 from datetime import datetime
+from itertools import count
 from pathlib import Path
 
 import requests
@@ -91,11 +92,23 @@ class Wheels:
         self.url = f'https://api.github.com/repos/{repository}/releases'
 
     def fetch_releases(self, token=None):
+        # The API is paginated (30 per page by default); without following the 'next' links,
+        # wheels that only exist in older releases silently drop out of the index.
         headers = self.headers(token=token)
-        response = requests.get(self.url, timeout=REQUESTS_TIMEOUT, headers=headers)
-        if (rc := response.status_code) != 200:  # noqa: PLR2004
-            raise FetchReleaseDataError(f'Download failed with status code {rc}')
-        return response.json()
+        releases = []
+        for page in count(1):
+            response = requests.get(
+                self.url,
+                params={'per_page': 100, 'page': page},
+                timeout=REQUESTS_TIMEOUT,
+                headers=headers,
+            )
+            if (rc := response.status_code) != 200:  # noqa: PLR2004
+                raise FetchReleaseDataError(f'Download failed with status code {rc}')
+            releases.extend(response.json())
+            if 'next' not in response.links:
+                break
+        return releases
 
     @staticmethod
     def headers(token=None):

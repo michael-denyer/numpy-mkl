@@ -17,6 +17,11 @@ on:
         type: string
         default: ""
         description: "Build this NumPy release instead of the ci-targets.yaml target"
+      python-versions:
+        required: false
+        type: string
+        default: ""
+        description: "Python versions to build instead of the ci-targets.yaml targets"
 
 env:
   PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
@@ -75,14 +80,20 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FORCE_BUILD: ${{ inputs.force-build || github.ref != 'refs/heads/main' }}
           NUMPY_VERSION: ${{ inputs.numpy-version }}
+          PYTHON_VERSIONS: ${{ inputs.python-versions }}
         run: |
+          read -ra python_versions <<<"${PYTHON_VERSIONS//,/ }"
+          python_args=()
+          for version in "${python_versions[@]}"; do
+            python_args+=("--python_versions=$version")
+          done
           for package in mkl-service numpy scipy; do
             version_args=()
             [[ "$package" == numpy && -n "$NUMPY_VERSION" ]] &&
               version_args+=(--version "$NUMPY_VERSION")
             uv run --locked tools/fetch_matrix2 "$package" \
               --config ci-targets.yaml --store build.json \
-              "${version_args[@]}" >"$package.json"
+              "${version_args[@]}" "${python_args[@]}" >"$package.json"
           done
 
           force_args=()

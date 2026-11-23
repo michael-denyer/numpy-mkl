@@ -172,6 +172,22 @@ class TestReleaseTagGuard(unittest.TestCase):
         ):
             self.parse('2.5.3\n')
 
+    def test_free_threaded_python_uses_the_same_version_requirement(self):
+        cls = self.fetch_matrix['FetchPackageData']
+        package = cls.__new__(cls)
+        package.config = SimpleNamespace(
+            python_versions=['3.12', '3.13', '3.15', '3.15t']
+        )
+        package.package_data = {'requires_python': '>=3.13,<3.16'}
+
+        self.assertEqual(package.fetch_python_versions(), ['cp313', 'cp315', 'cp315t'])
+
+        package.config.python_versions = ['3.15t\n']
+        with self.assertRaisesRegex(
+            self.fetch_matrix['FetchPackageDataError'], 'Invalid python version'
+        ):
+            package.fetch_python_versions()
+
 
 class TestWorkflowContracts(unittest.TestCase):
     def workflow(self, name):
@@ -233,7 +249,7 @@ class TestWorkflowContracts(unittest.TestCase):
         plan = coordinator['jobs']['plan']['steps'][-1]
         self.assertEqual(plan['env']['NUMPY_VERSION'], '${{ inputs.numpy-version }}')
         self.assertIn('version_args+=(--version "$NUMPY_VERSION")', plan['run'])
-        self.assertIn('"${version_args[@]}" >"$package.json"', plan['run'])
+        self.assertIn('"${version_args[@]}" "${python_args[@]}"', plan['run'])
 
     def test_every_force_workflow_routes_through_package_set(self):
         for name in ('force_mkl_service.yml', 'force_numpy.yml', 'force_scipy.yml'):
@@ -356,8 +372,12 @@ class TestWorkflowContracts(unittest.TestCase):
         self.assertIn('- Rebuild SciPy matched set', workflow)
 
         targets = yaml.safe_load((ROOT / 'ci-targets.yaml').read_text())
-        pinned = re.findall(r'^  "(\d+\.\d+)" = \{', pins, flags=re.MULTILINE)
-        self.assertEqual(pinned, targets['defaults']['python_versions'])
+        pinned = re.findall(r'^  "(\d+\.\d+t?)" = \{', pins, flags=re.MULTILINE)
+        self.assertTrue(pinned)
+        self.assertEqual(
+            pinned,
+            [v for v in targets['defaults']['python_versions'] if v in pinned],
+        )
         fork = 'https://github.com/michael-denyer/numpy-mkl/releases/download/'
         for package in ('numpy', 'scipy', 'mkl-service'):
             urls = re.findall(

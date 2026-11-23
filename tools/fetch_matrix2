@@ -20,6 +20,7 @@ REQUESTS_TIMEOUT = 45
 # characters that cannot break out of a 'key=value' line. PEP 440 also permits '!' and
 # '+', but a tag carrying either already fails the round-trip check in parse_release_tag.
 TAG_RE = re.compile(r'\A[A-Za-z0-9._-]+\Z')
+PYTHON_VERSION_RE = re.compile(r'3\.[0-9]{1,2}t?')
 
 RELEASES = 'https://api.github.com/repos/{repo}/releases'
 PYPROJECT = 'https://raw.githubusercontent.com/{repo}/refs/tags/{tag}/pyproject.toml'
@@ -86,7 +87,7 @@ class Config:
             if missing:
                 raise ValueError(f'Runner policy is missing fields: {sorted(missing)}')
             if runner['os'] not in {'Linux', 'Windows'}:
-                raise ValueError(f"Unknown runner policy OS {runner['os']!r}")
+                raise ValueError(f'Unknown runner policy OS {runner["os"]!r}')
             for field in ('numpy_ilp64', 'scipy_ilp64'):
                 if not isinstance(runner[field], bool):
                     raise ValueError(f'Runner policy {field} must be boolean')
@@ -149,11 +150,19 @@ class FetchPackageData:
         return self.package_data['tag']
 
     def fetch_python_versions(self):
-        # TODO: Handle free-threading tags
-        python_versions = self.config.python_versions
-        requires_python = self.package_data['requires_python']
-        supported_versions = SpecifierSet(requires_python).filter(python_versions)
-        return ['cp' + v.replace('.', '') for v in supported_versions]
+        # A trailing 't' marks a free-threaded build. It is an ABI flag rather than part of the
+        # version, so requires-python is checked against the bare version.
+        requires_python = SpecifierSet(self.package_data['requires_python'])
+        tags = []
+        for python_version in self.config.python_versions:
+            if not PYTHON_VERSION_RE.fullmatch(python_version):
+                raise FetchPackageDataError(
+                    f'Invalid python version {python_version!r}'
+                )
+            base = python_version.removesuffix('t')
+            if requires_python.contains(base):
+                tags.append('cp' + python_version.replace('.', ''))
+        return tags
 
 
 class FetchBuildMatrix:
