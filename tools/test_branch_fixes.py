@@ -183,16 +183,18 @@ class TestWorkflowContracts(unittest.TestCase):
                 self.assertIsInstance(yaml.safe_load(path.read_text()), dict)
 
     def test_pages_url_uses_current_repository_context(self):
-        for name in (
-            'links.yml',
-            'package_set.yml',
-            'wheels.yml',
-            'verify_package_set.yml',
-        ):
+        for name in ('links.yml', 'package_set.yml'):
             with self.subTest(workflow=name):
                 workflow = self.workflow(name)
                 self.assertIn('${{ github.repository_owner }}.github.io', workflow)
                 self.assertIn('${{ github.event.repository.name }}', workflow)
+
+    def test_wheel_build_and_verification_do_not_use_pages(self):
+        for name in ('wheels.yml', 'verify_package_set.yml'):
+            with self.subTest(workflow=name):
+                workflow = self.workflow(name)
+                self.assertNotIn('PAGES_URL', workflow)
+                self.assertNotIn('.github.io', workflow)
 
     def test_publication_is_owned_after_exact_set_verification(self):
         orchestrator = self.workflow('build_wheels.yml')

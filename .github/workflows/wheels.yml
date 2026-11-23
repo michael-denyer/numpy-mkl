@@ -24,9 +24,6 @@ on:
         type: string
         description: "Upstream version selected by the package-set plan"
 
-env:
-  PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
-
 jobs:
   build:
     name: ${{ inputs.name }}-${{ matrix.python_version }} (${{ matrix.runner }})
@@ -268,7 +265,8 @@ jobs:
               uv pip install meson-python ninja cmake cython
               ;;
           esac
-          uv build --wheel --index "$PAGES_URL" ${args}
+          # Use PyPI for build dependencies so the wheel build can run before publication.
+          uv build --wheel ${args}
 
       - name: Repair wheel (Linux)
         env:
@@ -386,8 +384,8 @@ jobs:
             }
             dependency_wheels+=("${numpy_wheels[0]}")
           fi
-          uv pip install "${dependency_wheels[@]}" "${built_wheels[@]}" \
-              --index "$PAGES_URL"
+          # The built wheels are local; PyPI supplies external dependencies such as MKL.
+          uv pip install "${dependency_wheels[@]}" "${built_wheels[@]}"
 
           case "$PACKAGE_NAME" in
             numpy)
